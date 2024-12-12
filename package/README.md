@@ -1,6 +1,8 @@
-# `package-name`
+# `@domain-expansion/astro`
 
-This is an [Astro integration](https://docs.astro.build/en/guides/integrations-guide/) that TODO:description
+This is an [Astro integration](https://docs.astro.build/en/guides/integrations-guide/) that Expands the Domain!
+
+_It adds Incremental Builds to Astro projects._
 
 ## Usage
 
@@ -63,7 +65,7 @@ This package is structured as a monorepo:
 - `playground` contains code for testing the package
 - `package` contains the actual package
 
-Install dependencies using pnpm: 
+Install dependencies using pnpm:
 
 ```bash
 pnpm i --frozen-lockfile

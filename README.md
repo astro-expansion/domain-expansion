@@ -1,9 +1,7 @@
-# package-name
+# DOMAIN :tm: EXPANSION :tm:
 
-TODO:description
-
-To see how to get started, check out the [package README](./package/README.md)
+Incremental :tm: build :tm: for :tm: Astro (not our :tm:).
 
 ## Licensing
 
-[MIT Licensed](./LICENSE). Made with ❤️ by [TODO:user](https://github.com/TODO:github-user).
+[MIT Licensed](./LICENSE). Made with ❤️ by [the :tm: Domain :tm: Expansion :tm: members :tm:](https://github.com/orgs/astro-expansion/people).
