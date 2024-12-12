@@ -21,3 +21,5 @@ Legend has it that, at 12:30am, the mages begun conjuring their greatest spell s
 ## Licensing
 
 [MIT Licensed](./LICENSE). Made with ❤️ :tm: by [the :tm: Domain :tm: Expansion :tm: members :tm:](https://github.com/orgs/astro-expansion/people).
+
+![deepfried_1734047259481](https://github.com/user-attachments/assets/6a5e55da-833f-4a5a-ba00-474c0871446b)
