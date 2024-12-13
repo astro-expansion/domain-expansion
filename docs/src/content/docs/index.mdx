@@ -31,6 +31,41 @@ The Domain Expansion integration can be installed from npm using the following c
 
 This will install the integration and add it to your `astro.config.mjs`.
 
+### Manual Installation
+
+Install the `@domain-expansion/astro` package using your package manager of choice:
+
+<Tabs>
+	<TabItem label="npm">
+		```bash
+		npm i @domain-expansion/astro
+		```
+	</TabItem>
+	<TabItem label="pnpm">
+		```bash
+		pnpm add @domain-expansion/astro
+		```
+	</TabItem>
+	<TabItem label="yarn">
+		```bash
+		yarn add @domain-expansion/astro
+		```
+	</TabItem>
+</Tabs>
+
+Import and use the integration in your `astro.config.mjs`:
+
+```js
+import { defineConfig } from 'astro/config';
+import domainExpansion from "@domain-expansion/astro";
+
+export default defineConfig({
+	integrations: [
+		domainExpansion(),
+	],
+});
+```
+
 ## Usage
 
 Once the integration has been included in your `astro.config.mjs`, the next time you build your site,
