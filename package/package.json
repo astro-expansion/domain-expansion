@@ -1,12 +1,12 @@
 {
 	"name": "@domain-expansion/astro",
 	"version": "0.0.0",
-	"description": "Expanding™️ the™️ bits™️ since™️ 2024-12-12™️",
-	"author": {
-		"email": "TODO:",
-		"name": "TODO:",
-		"url": "TODO:"
-	},
+	"description": "Expanding™ the™ bits™ since™ 2024-12-12™",
+	"contributors": [
+		"Luiz Ferraz (https://github.com/Fryuni)",
+		"Louis Escher (https://github.com/louisescher)",
+		"Reuben Tier (https://github.com/theotterlord)"
+	],
 	"license": "MIT",
 	"keywords": [
 		"astro-integration",

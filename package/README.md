@@ -6,24 +6,20 @@ _It adds Incremental Builds to Astro projects._
 
 ## Usage
 
-### Prerequisites
-
-TODO:
-
 ### Installation
 
 Install the integration **automatically** using the Astro CLI:
 
 ```bash
-pnpm astro add package-name
+pnpm astro add @domain-expansion/astro
 ```
 
 ```bash
-npx astro add package-name
+npx astro add @domain-expansion/astro
 ```
 
 ```bash
-yarn astro add package-name
+yarn astro add @domain-expansion/astro
 ```
 
 Or install it **manually**:
@@ -31,32 +27,28 @@ Or install it **manually**:
 1. Install the required dependencies
 
 ```bash
-pnpm add package-name
+pnpm add @domain-expansion/astro
 ```
 
 ```bash
-npm install package-name
+npm install @domain-expansion/astro
 ```
 
 ```bash
-yarn add package-name
+yarn add @domain-expansion/astro
 ```
 
 2. Add the integration to your astro config
 
 ```diff
-+import integration from "package-name";
++import domainExpansion from "@domain-expansion/astro";
 
 export default defineConfig({
   integrations: [
-+    integration(),
++    domainExpansion(),
   ],
 });
 ```
-
-### Configuration
-
-TODO:configuration
 
 ## Contributing
 
@@ -64,6 +56,7 @@ This package is structured as a monorepo:
 
 - `playground` contains code for testing the package
 - `package` contains the actual package
+- `docs` contains the documentation
 
 Install dependencies using pnpm:
 
@@ -74,15 +67,17 @@ pnpm i --frozen-lockfile
 Start the playground and package watcher:
 
 ```bash
-pnpm dev
+pnpm playground:dev
 ```
 
 You can now edit files in `package`. Please note that making changes to those files may require restarting the playground dev server.
 
 ## Licensing
 
-[MIT Licensed](https://github.com/TODO:/blob/main/LICENSE). Made with ❤️ by [TODO:](https://github.com/TODO:).
+[MIT Licensed](https://github.com/astro-expansion/domain-expansion/blob/main/LICENSE). Made with ❤️ by [the Domain Expansion](https://github.com/TODO:).
 
 ## Acknowledgements
 
-TODO:
+- [Luiz Ferraz](https://github.com/Fryuni)
+- [Louis Escher](https://github.com/louisescher)
+- [Reuben Tier](https://github.com/theotterlord)
