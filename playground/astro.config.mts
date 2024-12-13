@@ -7,6 +7,7 @@ const { default: packageName } = await import("@domain-expansion/astro");
 
 // https://astro.build/config
 export default defineConfig({
+	compressHTML: false,
 	integrations: [
 		tailwind(),
 		packageName(),
