@@ -7,11 +7,11 @@ Domain Expansion works under the hood.
 
 ## How Astro builds your site
 
-Whenever you run `astro build`, Astro will essentially "request" your pages internally and save the resulting HTML.
-This happens with two functions, `$$render` and `$$renderComponent`. The first one is used to render the whole page,
-while the latter is used to render components. You can see the output of these functions on 
-[the live Astro compiler](https://live-astro-compiler.vercel.app/). The output of a page from the compiler will look
-somewhat like this:
+Whenever you run `astro build`, Astro will essentially "request" your components internally and save the 
+resulting HTML. This happens with two functions, `$$render` and `$$renderComponent`. The first one is used to render 
+the whole component, while the latter is used to render nested components. You can see the output of these 
+functions on [the live Astro compiler](https://live-astro-compiler.vercel.app/). The output of a component from the compiler 
+will look somewhat like this:
 
 ```ts
 import {
@@ -51,7 +51,8 @@ export default $$stdin;
 ```
 
 You can see how the `$$renderComponent` template tag is used to render the components `Foo` and `Bar`,
-while the `$$render` template tag is used to render the whole page or smaller bits which don't require components.
+while the `$$render` template tag is used to render the whole component or children of components which
+themselves do not contain any further child components.
 
 ## Intercepting the build process
 
@@ -71,5 +72,4 @@ Second, if the component has children, we also include the hash of the parent co
 included in the hash along with the component name and its props. Again, if the hash is the same, we can
 return the cached content, if not, we render the component and save it to the cache.
 
-The cache is saved in `node_modules/.domain-expansion`. Additionally, whenever the Astro compiler receives an update, the entire
-cache is invalidated.
+The cache is saved in `node_modules/.domain-expansion`.
