@@ -1,6 +1,8 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+import node from '@astrojs/node';
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://domainexpansion.gg',
@@ -38,5 +40,10 @@ export default defineConfig({
     pagination: false,
     lastUpdated: true
   })],
-  output: "static"
+
+  output: "hybrid",
+
+  adapter: node({
+    mode: 'standalone'
+  })
 });
