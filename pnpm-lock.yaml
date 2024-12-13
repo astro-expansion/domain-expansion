@@ -50,10 +50,25 @@ importers:
       astro-integration-kit:
         specifier: ^0.17.0
         version: 0.17.0(astro@5.0.5(@types/node@22.10.2)(jiti@1.21.6)(rollup@4.28.1)(typescript@5.7.2)(yaml@2.6.1))
+      debug:
+        specifier: ^4.4.0
+        version: 4.4.0
+      magic-string:
+        specifier: ^0.30.15
+        version: 0.30.15
     devDependencies:
+      '@types/debug':
+        specifier: ^4.1.12
+        version: 4.1.12
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.10.2
       tsup:
         specifier: ^8.3.5
         version: 8.3.5(jiti@1.21.6)(postcss@8.4.49)(typescript@5.7.2)(yaml@2.6.1)
+      vite:
+        specifier: ^6.0.3
+        version: 6.0.3(@types/node@22.10.2)(jiti@1.21.6)(yaml@2.6.1)
 
   playground:
     dependencies:
