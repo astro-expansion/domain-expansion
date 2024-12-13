@@ -37,9 +37,14 @@
 		"astro": "^5.0.0"
 	},
 	"dependencies": {
-		"astro-integration-kit": "^0.17.0"
+		"astro-integration-kit": "^0.17.0",
+		"debug": "^4.4.0",
+		"magic-string": "^0.30.15"
 	},
 	"devDependencies": {
-		"tsup": "^8.3.5"
+		"@types/debug": "^4.1.12",
+		"@types/node": "^22.10.2",
+		"tsup": "^8.3.5",
+		"vite": "^6.0.3"
 	}
 }
