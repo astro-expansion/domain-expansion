@@ -1,49 +1,35 @@
+// @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import catppuccin from "starlight-theme-catppuccin";
 
 import node from '@astrojs/node';
+import starlightImageZoomPlugin from 'starlight-image-zoom';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://domainexpansion.gg',
-  integrations: [starlight({
-    title: 'Domain Expansion',
-    logo: {
-      src: './src/assets/ion-logo.svg'
-    },
-    social: {
-      github: 'https://github.com/astro-expansion/domain-expansion'
-    },
-    sidebar: [{
-      label: '[book] Getting Started',
-      link: '/getting-started/'
-    }],
-    components: {
-      ThemeProvider: './src/components/ThemeProvider.astro',
-      ThemeSelect: './src/components/ThemeSelect.astro',
-      SiteTitle: './src/components/SiteTitle.astro',
-      Sidebar: './src/components/Sidebar.astro',
-      Pagination: './src/components/Pagination.astro',
-      Hero: './src/components/Hero.astro',
-      Head: './src/components/Head.astro',
-      PageTitle: './src/components/PageTitle.astro'
-    },
-    customCss: [
-      '@fontsource-variable/space-grotesk/index.css',
-      '@fontsource/space-mono/400.css',
-      '@fontsource/space-mono/700.css',
-      './src/styles/theme.css'
-    ],
-    expressiveCode: {
-      themes: ['github-dark']
-    },
-    pagination: false,
-    lastUpdated: true
-  })],
-
-  output: "hybrid",
+	site: 'https://domainexpansion.gg',
+  integrations: [
+		starlight({
+			title: 'Domain Expansion',
+			social: {
+				github: 'https://github.com/astro-expansion/domain-expansion',
+			},
+			sidebar: [
+				{ label: 'The Tale of the Three Mages', slug: 'the-tale-of-the-three-mages' },
+				{ label: 'An actual explanation of what is going on here', slug: 'actual-explanation' },
+			],
+			plugins: [
+				catppuccin({ dark: 'mocha-teal', light: 'latte-teal' }),
+				starlightImageZoomPlugin(),
+			],
+			components: {
+				Head: './src/overrides/Head.astro',
+			}
+		}),
+	],
 
   adapter: node({
-    mode: 'standalone'
-  })
+    mode: 'standalone',
+  }),
 });

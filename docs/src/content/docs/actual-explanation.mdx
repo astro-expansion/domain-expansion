@@ -1,0 +1,75 @@
+---
+title: An actual explanation of what is going on here
+---
+
+After readint the Tale of the Three Mages, you might be a little confused, so here's an actual explanation of how 
+Domain Expansion works under the hood.
+
+## How Astro builds your site
+
+Whenever you run `astro build`, Astro will essentially "request" your pages internally and save the resulting HTML.
+This happens with two functions, `$$render` and `$$renderComponent`. The first one is used to render the whole page,
+while the latter is used to render components. You can see the output of these functions on 
+[the live Astro compiler](https://live-astro-compiler.vercel.app/). The output of a page from the compiler will look
+somewhat like this:
+
+```ts
+import {
+  Fragment,
+  render as $$render,
+  createAstro as $$createAstro,
+  createComponent as $$createComponent,
+  renderComponent as $$renderComponent,
+  renderHead as $$renderHead,
+  maybeRenderHead as $$maybeRenderHead,
+  unescapeHTML as $$unescapeHTML,
+  renderSlot as $$renderSlot,
+  mergeSlots as $$mergeSlots,
+  addAttribute as $$addAttribute,
+  spreadAttributes as $$spreadAttributes,
+  defineStyleVars as $$defineStyleVars,
+  defineScriptVars as $$defineScriptVars,
+  renderTransition as $$renderTransition,
+  createTransitionScope as $$createTransitionScope,
+  renderScript as $$renderScript,
+  
+} from "astro/runtime/server/index.js";
+import Foo from './Foo.astro';
+import Bar from './Bar.astro';
+
+const $$stdin = $$createComponent(($$result, $$props, $$slots) => {
+
+return $$render`${$$maybeRenderHead($$result)}<div>
+    ${$$renderComponent($$result,'Foo',Foo,{},{"default": () => $$render`
+        Domain Expansion
+    `,})}
+    ${$$renderComponent($$result,'Bar',Bar,{"baz":"tizio"})}
+</div>`;
+}, '<stdin>', undefined);
+export default $$stdin;
+
+```
+
+You can see how the `$$renderComponent` template tag is used to render the components `Foo` and `Bar`,
+while the `$$render` template tag is used to render the whole page or smaller bits which don't require components.
+
+## Intercepting the build process
+
+When you install Domain Expansion and add the integration, it adds a Vite plugin. This plugin essentially
+just replaces the `$$render` and `$$renderComponent` functions with its own versions. The new `$$render` 
+function checks the cache based on a hash of the component which is calling `$$render`. If the hash is the
+same as the one in the cache, we can be sure that the content hasn't changed, so we can just return the cached
+content. If the hash is different, we need to render the content again and save it to the cache.
+
+The `$$renderComponent` function works in a similar way, although there are two different scenarios here.
+
+First, if the component has no children (it is self-closing, like this: `<Foo />`), we compute the hash
+based on the name of the component and the props. If neither changed, we can return the cached content, if not,
+we simply re-render it.
+
+Second, if the component has children, we also include the hash of the parent component, which then gets
+included in the hash along with the component name and its props. Again, if the hash is the same, we can
+return the cached content, if not, we render the component and save it to the cache.
+
+The cache is saved in `node_modules/.domain-expansion`. Additionally, whenever the Astro compiler receives an update, the entire
+cache is invalidated.

@@ -1,14 +1,44 @@
 ---
 title: Domain Expansion
 description: And they said incremental builds in Astro weren't possible.
-tableOfContents: false
-hero:
-  tagline: And they said incremental builds in Astro weren't possible.
-  image:
-    file: ../../assets/ion-logo.svg
-  actions:
-    - text: Expand your domain
-      link: /starlight-ion-theme/features/
-      icon: right-arrow
-      variant: primary
 ---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+Domain Expansion is an Astro integration that adds support for incremental builds.
+
+## Installation
+
+The Domain Expansion integration can be installed from npm using the following command:
+
+<Tabs>
+	<TabItem label="npm">
+		```bash
+		npx astro add @domain-expansion/astro
+		```
+	</TabItem>
+	<TabItem label="pnpm">
+		```bash
+		pnpm astro add @domain-expansion/astro
+		```
+	</TabItem>
+	<TabItem label="yarn">
+		```bash
+		yarn astro add @domain-expansion/astro
+		```
+	</TabItem>
+</Tabs>
+
+This will install the integration and add it to your `astro.config.mjs`.
+
+## Usage
+
+Once the integration has been included in your `astro.config.mjs`, the next time you build your site,
+your build will be cached. From that point on, whenever you rebuild your site, only the files that have
+changed will be rebuilt.
+
+## Authors
+
+- [Luiz Ferraz](https://github.com/Fryuni)
+- [Louis Escher](https://github.com/louisescher)
+- [Reuben Tier](https://github.com/theotterlord)

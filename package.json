@@ -9,6 +9,7 @@
 		"package:build": "pnpm -r --filter @domain-expansion/astro build",
 		"package:dev": "pnpm -r --filter @domain-expansion/astro dev",
 		"playground:dev": "pnpm --filter playground dev",
+		"playground:build": "pnpm --filter playground build",
 		"docs:dev": "pnpm --filter docs dev",
 		"docs:build": "pnpm --filter docs build",
 		"docs:start": "pnpm --filter docs start",
