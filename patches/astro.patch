@@ -1,0 +1,12 @@
+diff --git a/dist/vite-plugin-astro/index.js b/dist/vite-plugin-astro/index.js
+index 9b3da9298ef85e4e8af02edc8a6a7f0d3a66d3a1..4bfa9a8307e06e8859b83a873d72df89edfb4fe6 100644
+--- a/dist/vite-plugin-astro/index.js
++++ b/dist/vite-plugin-astro/index.js
+@@ -178,6 +178,7 @@ File: ${id}`
+         scripts: transformResult.scripts,
+         containsHead: transformResult.containsHead,
+         propagation: transformResult.propagation ? "self" : "none",
++        scope: transformResult.scope,
+         pageOptions: {}
+       };
+       return {

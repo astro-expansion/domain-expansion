@@ -8,12 +8,15 @@ export default defineConfig((options) => {
 		format: ["esm"],
 		target: "node18",
 		bundle: true,
-		dts: true,
+		dts: false,
 		sourcemap: true,
 		clean: true,
 		splitting: false,
 		minify: !dev,
-		external: [...Object.keys(peerDependencies)],
+		external: [
+			...Object.keys(peerDependencies),
+			/node_modules/g,
+		],
 		tsconfig: "tsconfig.json",
 	};
 });
