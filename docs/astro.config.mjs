@@ -16,6 +16,7 @@ export default defineConfig({
 				github: 'https://github.com/astro-expansion/domain-expansion',
 			},
 			sidebar: [
+				{ label: 'Installation', slug: '' },
 				{ label: 'The Tale of the Three Mages', slug: 'the-tale-of-the-three-mages' },
 				{ label: 'An actual explanation of what is going on here', slug: 'actual-explanation' },
 			],
