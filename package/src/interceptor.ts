@@ -45,6 +45,7 @@ import { HTMLBytes, HTMLString } from "astro/runtime/server/index.js";
 import { SlotString } from "astro/runtime/server/render/slot.js";
 import { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
 import { isRenderTemplateResult, renderTemplate } from "astro/runtime/server/render/astro/render-template.js";
+import { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
 
 Object.assign(globalThis[Symbol.for('@domain-expansion:astro-runtime-instances')] ?? {}, {
   HTMLBytes: HTMLBytes,
@@ -54,6 +55,7 @@ Object.assign(globalThis[Symbol.for('@domain-expansion:astro-runtime-instances')
   isHeadAndContent: isHeadAndContent,
   renderTemplate: renderTemplate,
   isRenderTemplateResult: isRenderTemplateResult,
+  createRenderInstruction: createRenderInstruction,
 });
 
 const sym = Symbol.for('@domain-expansion:astro');

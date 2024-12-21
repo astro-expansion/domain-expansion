@@ -4,7 +4,7 @@ import { Cache } from "./cache.ts";
 import { rootDebug } from "./debug.ts";
 import { relative } from 'pathe';
 import type { AstroComponentFactory } from "astro/runtime/server/index.js";
-import type { SSRResult } from "astro";
+import type { SSRMetadata, SSRResult } from "astro";
 import { fileURLToPath } from "url";
 
 type CacheRenderingFn = (originalFn: typeof Runtime.createComponent) => typeof Runtime.createComponent;
@@ -65,10 +65,78 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
 
       const url = new URL(result.request.url);
 
-      const hash = hashSum([result.params, url.pathname, url.search, resolvedProps]);
+      const hash = hashSum([result.compressHTML, result.params, url.pathname, url.search, resolvedProps]);
 
-      return cache.getValue(`${cacheScope}:${hash}`, () => factory(result, props, slots));
+      let wasRefreshed = false;
 
+      const cachedValue = await cache.getValue(`${cacheScope}:${hash}`, async () => {
+        wasRefreshed = true;
+        const previousExtraHeadLength = result._metadata.extraHead.length;
+        const renderedScriptsDiff = delayedSetDifference(result._metadata.renderedScripts);
+        const hasDirectivedDiff = delayedSetDifference(result._metadata.hasDirectives);
+        const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
+
+        const value = await factory(result, props, slots);
+
+        return {
+          styles: result.styles,
+          scripts: result.scripts,
+          links: result.links,
+          componentMetadata: result.componentMetadata,
+          inlinedScripts: result.inlinedScripts,
+          metadata: () => ({
+            ...result._metadata,
+            extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
+            renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
+            hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
+            rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
+          }),
+          value,
+        };
+      });
+
+      result.styles = cachedValue.styles;
+      result.scripts = cachedValue.scripts;
+      result.links = cachedValue.links;
+      result.componentMetadata = cachedValue.componentMetadata;
+      result.inlinedScripts = cachedValue.inlinedScripts;
+
+      if (!wasRefreshed) {
+        const cachedMetadata = cachedValue.metadata();
+        const newMetadata: SSRMetadata = {
+          ...cachedMetadata,
+          extraHead: result._metadata.extraHead.concat(cachedMetadata.extraHead),
+          renderedScripts: new Set([
+            ...result._metadata.renderedScripts.values(),
+            ...cachedMetadata.renderedScripts.values(),
+          ]),
+          hasDirectives: new Set([
+            ...result._metadata.hasDirectives.values(),
+            ...cachedMetadata.hasDirectives.values(),
+          ]),
+          rendererSpecificHydrationScripts: new Set([
+            ...result._metadata.rendererSpecificHydrationScripts.values(),
+            ...cachedMetadata.rendererSpecificHydrationScripts.values(),
+          ]),
+          propagators: result._metadata.propagators,
+        };
+
+
+        result._metadata = newMetadata;
+      }
+
+      return cachedValue.value;
     }
+  }
+}
+
+function delayedSetDifference(previous: Set<string>): (next: Set<string>) => Set<string> {
+  const storedPrevious = new Set(previous);
+  return (next) => {
+    const newSet = new Set(next);
+    for (const k of storedPrevious.values()) {
+      newSet.delete(k);
+    }
+    return newSet;
   }
 }

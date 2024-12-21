@@ -1,15 +1,14 @@
 import { rootDebug } from "./debug.ts";
-import { RenderFileStore, type ValueThunk } from "./renderFileStore.ts";
-import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
+import { RenderFileStore, type PersistedValue, type PersistingValue } from "./renderFileStore.ts";
 
 const debug = rootDebug.extend('cache');
 
 type MaybePromise<T> = Promise<T> | T;
 
 export class Cache {
-  private readonly inMemory = new Map<string, ValueThunk | null>();
+  private readonly inMemory = new Map<string, PersistedValue | null>();
 
-  private readonly loading = new Map<string, Promise<ValueThunk | null>>();
+  private readonly loading = new Map<string, Promise<PersistedValue | null>>();
 
   private readonly persisted: RenderFileStore;
 
@@ -19,26 +18,33 @@ export class Cache {
     this.persisted = new RenderFileStore(cacheDir);
   }
 
-  public async saveValue(key: string, factoryValue: AstroFactoryReturnValue): Promise<AstroFactoryReturnValue> {
+  public async saveValue(key: string, factoryValue: PersistingValue): Promise<PersistingValue> {
     const promise = this.persisted.persistValue(key, factoryValue);
     this.storeLoadingStage(key, promise);
 
-    const thunk = await promise;
-    return thunk();
+    const { value } = await promise;
+    return {
+      ...factoryValue,
+      value: value(),
+    };
   }
 
   public async getValue(
     key: string,
-    loadFresh: () => MaybePromise<AstroFactoryReturnValue>,
-  ): Promise<AstroFactoryReturnValue> {
-    const thunk = await this.getCachedRenderer(key);
+    loadFresh: () => MaybePromise<PersistingValue>,
+  ): Promise<PersistingValue> {
+    const value = await this.getCachedRenderer(key);
 
-    if (thunk) return thunk();
+    if (value) return {
+      ...value,
+      metadata: () => value.metadata,
+      value: value.value(),
+    }
 
     return this.saveValue(key, await loadFresh());
   }
 
-  private getCachedRenderer(key: string): Promise<ValueThunk | null> {
+  private getCachedRenderer(key: string): Promise<PersistedValue | null> {
     const fromMemory = this.inMemory.get(key);
     if (fromMemory !== undefined) {
       debug(`Retrieve renderer for "${key}" from memory`);
@@ -60,7 +66,7 @@ export class Cache {
     return newPromise;
   }
 
-  private storeLoadingStage(key: string, promise: Promise<ValueThunk | null>): void {
+  private storeLoadingStage(key: string, promise: Promise<PersistedValue | null>): void {
     this.loading.set(key, promise);
     this.inMemory.delete(key);
     promise

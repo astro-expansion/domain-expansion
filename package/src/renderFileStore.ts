@@ -10,7 +10,8 @@ import type { createHeadAndContent, isHeadAndContent } from "astro/runtime/serve
 import type { isRenderTemplateResult, renderTemplate, RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
 import { Either } from "./either.ts";
 import { createHash } from 'node:crypto';
-import { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
+import type { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
+import type { SSRComponentMetadata, SSRElement, SSRMetadata } from "astro";
 
 type RuntimeInstances = {
   HTMLBytes: typeof HTMLBytes,
@@ -20,6 +21,7 @@ type RuntimeInstances = {
   isHeadAndContent: typeof isHeadAndContent,
   renderTemplate: typeof renderTemplate,
   isRenderTemplateResult: typeof isRenderTemplateResult,
+  createRenderInstruction: typeof createRenderInstruction,
 }
 
 const runtime: RuntimeInstances = ((globalThis as any)[Symbol.for('@domain-expansion:astro-runtime-instances')] = {} as RuntimeInstances);
@@ -73,6 +75,21 @@ type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializ
   [T in K]: ValueSerializationMap[T] & { type: T }
 }[K];
 
+export type PersistedValue = {
+  styles: Set<SSRElement>,
+  scripts: Set<SSRElement>,
+  links: Set<SSRElement>,
+  componentMetadata: Map<string, SSRComponentMetadata>,
+  inlinedScripts: Map<string, string>,
+  metadata: Omit<SSRMetadata, 'propagators'>,
+  value: ValueThunk,
+}
+
+export type PersistingValue = Omit<PersistedValue, 'value' | 'metadata'> & {
+  metadata: () => PersistedValue['metadata'],
+  value: AstroFactoryReturnValue,
+};
+
 export type ValueThunk = () => AstroFactoryReturnValue;
 
 const debug = rootDebug.extend('file-store');
@@ -84,32 +101,62 @@ export class RenderFileStore {
     this.resolver = createResolver(cacheDir).resolve;
   }
 
-  public async persistValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
-    const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
+  public async persistValue(key: string, value: PersistingValue): Promise<PersistedValue> {
+    const { denormalized, clone } = await RenderFileStore.denormalizeValue(value.value);
+
+    const metadata = value.metadata();
 
     if (denormalized) {
       await writeFile(
         await this.resolvePath(key),
-        JSON.stringify(denormalized, null, 2),
+        JSON.stringify({
+          styles: Array.from(value.styles),
+          scripts: Array.from(value.scripts),
+          links: Array.from(value.links),
+          componentMetadata: Object.fromEntries(value.componentMetadata.entries()),
+          inlinedScripts: Object.fromEntries(value.inlinedScripts.entries()),
+          metadata: {
+            ...metadata,
+            hasDirectives: Array.from(metadata.hasDirectives),
+            renderedScripts: Array.from(metadata.renderedScripts),
+            rendererSpecificHydrationScripts: Array.from(metadata.rendererSpecificHydrationScripts),
+          },
+          value: denormalized,
+        }, null, 2),
         'utf-8'
       );
     }
 
-    return clone;
+    return {
+      ...value,
+      metadata,
+      value: clone,
+    };
   }
 
-  public async loadRenderer(key: string): Promise<ValueThunk | null> {
+  public async loadRenderer(key: string): Promise<PersistedValue | null> {
     try {
-      const serializedValue: SerializedValue = JSON.parse(
+      const serializedValue: Omit<PersistedValue, 'value'> & { value: SerializedValue } = JSON.parse(
         await readFile(await this.resolvePath(key), 'utf-8'),
       );
 
-      console.count('domain-expansion:cache-hit');
       debug('Cache hit', key);
 
-      return RenderFileStore.normalizeValue(serializedValue);
+      return {
+        styles: new Set(serializedValue.styles),
+        scripts: new Set(serializedValue.scripts),
+        links: new Set(serializedValue.links),
+        componentMetadata: new Map(Object.entries(serializedValue.componentMetadata)),
+        inlinedScripts: new Map(Object.entries(serializedValue.inlinedScripts)),
+        metadata: {
+          ...serializedValue.metadata,
+          hasDirectives: new Set(serializedValue.metadata.hasDirectives),
+          renderedScripts: new Set(serializedValue.metadata.renderedScripts),
+          rendererSpecificHydrationScripts: new Set(serializedValue.metadata.rendererSpecificHydrationScripts),
+        },
+        value: RenderFileStore.normalizeValue(serializedValue.value),
+      };
     } catch {
-      console.count('domain-expansion:cache-miss');
       debug('Cache miss', key);
       return null;
     }
@@ -119,7 +166,7 @@ export class RenderFileStore {
     const hash = createHash('sha3-224')
       .update(key, 'utf8')
       .digest('hex');
-    const pathSegments = hash.match(/.{1,8}/g)!;
+    const pathSegments = hash.match(/.{1,64}/g)!;
     const dir = this.resolver(...pathSegments.slice(0, -1));
     await mkdir(dir, { recursive: true });
 
@@ -138,14 +185,17 @@ export class RenderFileStore {
     if (runtime.isHeadAndContent(value)) {
       const chunks = await RenderFileStore.renderTemplateToChunks(value.content);
       const seminormalChunks = await Promise.all(chunks.map(RenderFileStore.tryDenormalizeChunk));
-      const clone = () => RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks);
+      const clone = () => runtime.createHeadAndContent(
+        value.head,
+        RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks),
+      );
 
       return seminormalChunks.every(Either.isRight)
         ? {
           clone,
           denormalized: {
             type: 'headAndContent',
-            head: value.head,
+            head: value.head.toString(),
             chunks: seminormalChunks.map(right => right.value),
           },
         }
@@ -171,7 +221,11 @@ export class RenderFileStore {
     switch (value.type) {
       case "headAndContent": {
         const seminormalChunks = value.chunks.map(Either.right);
-        return () => runtime.createHeadAndContent(value.head, RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks));
+        return () => runtime.createHeadAndContent(
+          // SAFETY: Astro core is wrong
+          new runtime.HTMLString(value.head) as unknown as string,
+          RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks),
+        );
       }
       case "templateResult": {
         const seminormalChunks = value.chunks.map(Either.right);
@@ -261,13 +315,13 @@ export class RenderFileStore {
       case "htmlBytes":
         return new runtime.HTMLBytes(Buffer.from(chunk.value, 'base64'));
       case "slotString":
-        return new runtime.SlotString(chunk.value, chunk.renderInstructions ?? null);
+        return new runtime.SlotString(
+          chunk.value,
+          chunk.renderInstructions
+            ?.map(RenderFileStore.normalizeRenderInstruction) ?? null,
+        );
       case "renderInstruction":
-        // SAFETY: `createRenderInstruction` uses an overload to handle the types of each render instruction
-        //         individually. This breaks when the given instruction can be any of them as no overload
-        //         accepts them indistinctivelly. Each individual type matches the output so the following
-        //         is valid.
-        return createRenderInstruction(chunk.instruction as any) as RenderInstruction;
+        return RenderFileStore.normalizeRenderInstruction(chunk.instruction);
       case "arrayBufferView": {
         const buffer = Buffer.from(chunk.value, 'base64');
         return {
@@ -281,6 +335,14 @@ export class RenderFileStore {
           headers: chunk.headers
         });
     }
+  }
+
+  private static normalizeRenderInstruction(instruction: SerializableRenderInstruction): RenderInstruction {
+    // SAFETY: `createRenderInstruction` uses an overload to handle the types of each render instruction
+    //         individually. This breaks when the given instruction can be any of them as no overload
+    //         accepts them indistinctivelly. Each individual type matches the output so the following
+    //         is valid.
+    return runtime.createRenderInstruction(instruction as any);
   }
 
   private static async denormalizeResponse(value: Response): Promise<SerializedValue<'response'> & SerializedChunk<'response'>> {
