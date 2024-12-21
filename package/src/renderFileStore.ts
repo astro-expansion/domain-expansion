@@ -4,11 +4,13 @@ import { rootDebug } from "./debug.ts";
 import type { HTMLBytes, HTMLString, RenderInstruction } from "astro/runtime/server/index.js";
 import type { SlotString } from "astro/runtime/server/render/slot.js";
 import { readFile, writeFile } from "fs/promises";
-import { mkdirSync } from "fs";
+import { mkdir } from "fs/promises";
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import type { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
 import type { isRenderTemplateResult, renderTemplate, RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
 import { Either } from "./either.ts";
+import { createHash } from 'node:crypto';
+import { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
 
 type RuntimeInstances = {
   HTMLBytes: typeof HTMLBytes,
@@ -79,7 +81,6 @@ export class RenderFileStore {
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
   public constructor(cacheDir: string) {
-    mkdirSync(cacheDir, { recursive: true });
     this.resolver = createResolver(cacheDir).resolve;
   }
 
@@ -88,12 +89,8 @@ export class RenderFileStore {
 
     if (denormalized) {
       await writeFile(
-        this.resolver(key),
-        JSON.stringify(
-          denormalized,
-          null,
-          2
-        ),
+        await this.resolvePath(key),
+        JSON.stringify(denormalized, null, 2),
         'utf-8'
       );
     }
@@ -103,7 +100,9 @@ export class RenderFileStore {
 
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const serializedValue: SerializedValue = JSON.parse(await readFile(this.resolver(key), 'utf-8'));
+      const serializedValue: SerializedValue = JSON.parse(
+        await readFile(await this.resolvePath(key), 'utf-8'),
+      );
 
       console.count('domain-expansion:cache-hit');
       debug('Cache hit', key);
@@ -114,6 +113,17 @@ export class RenderFileStore {
       debug('Cache miss', key);
       return null;
     }
+  }
+
+  private async resolvePath(key: string): Promise<string> {
+    const hash = createHash('sha3-224')
+      .update(key, 'utf8')
+      .digest('hex');
+    const pathSegments = hash.match(/.{1,8}/g)!;
+    const dir = this.resolver(...pathSegments.slice(0, -1));
+    await mkdir(dir, { recursive: true });
+
+    return this.resolver(...pathSegments);
   }
 
   private static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
@@ -253,7 +263,11 @@ export class RenderFileStore {
       case "slotString":
         return new runtime.SlotString(chunk.value, chunk.renderInstructions ?? null);
       case "renderInstruction":
-        return chunk.instruction;
+        // SAFETY: `createRenderInstruction` uses an overload to handle the types of each render instruction
+        //         individually. This breaks when the given instruction can be any of them as no overload
+        //         accepts them indistinctivelly. Each individual type matches the output so the following
+        //         is valid.
+        return createRenderInstruction(chunk.instruction as any) as RenderInstruction;
       case "arrayBufferView": {
         const buffer = Buffer.from(chunk.value, 'base64');
         return {
@@ -306,13 +320,19 @@ export class RenderFileStore {
 
     return Object.assign(template, {
       render: (destination: RenderDestination) => {
-        for (const chunk of chunks) {
-          if (Either.isLeft(chunk)) {
-            destination.write(chunk.value);
-          } else {
-            destination.write(RenderFileStore.normalizeChunk(chunk.value));
-          }
-        }
+        return new Promise<void>(resolve => {
+          setImmediate(() => {
+            for (const chunk of chunks) {
+              if (Either.isLeft(chunk)) {
+                destination.write(chunk.value);
+              } else {
+                destination.write(RenderFileStore.normalizeChunk(chunk.value));
+              }
+            }
+
+            resolve();
+          });
+        });
       }
     })
   }

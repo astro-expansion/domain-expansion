@@ -25,7 +25,8 @@
 	},
 	"pnpm": {
 		"patchedDependencies": {
-			"astro": "patches/astro.patch"
+			"astro": "patches/astro.patch",
+			"@astrojs/starlight": "patches/@astrojs__starlight.patch"
 		}
 	}
 }
