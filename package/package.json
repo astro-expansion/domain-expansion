@@ -39,13 +39,16 @@
 	"dependencies": {
 		"astro-integration-kit": "^0.17.0",
 		"debug": "^4.4.0",
+		"estree-walker": "^3.0.3",
 		"hash-sum": "^2.0.0",
-		"magic-string": "^0.30.15"
+		"magic-string": "^0.30.15",
+		"pathe": "^1.1.2"
 	},
 	"devDependencies": {
 		"@types/debug": "^4.1.12",
 		"@types/hash-sum": "^1.0.2",
 		"@types/node": "^22.10.2",
+		"rollup": "^4.29.0",
 		"tsup": "^8.3.5",
 		"vite": "^6.0.3"
 	}

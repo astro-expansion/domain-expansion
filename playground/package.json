@@ -8,7 +8,7 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "reload": "DEBUG=domain-expansion:* astro build && astro preview",
+    "reload": "NODE_OPTIONS='--enable-source-maps --inspect' DEBUG=domain-expansion:* astro build && astro preview",
     "astro": "astro"
   },
   "dependencies": {
