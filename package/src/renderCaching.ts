@@ -1,11 +1,13 @@
 import type * as Runtime from "astro/compiler-runtime";
 import hashSum from "hash-sum";
-import { Cache } from "./cache.ts";
-import { rootDebug } from "./debug.ts";
+import { Cache } from "./cache.js";
+import { rootDebug } from "./debug.js";
 import { relative } from 'pathe';
 import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import type { SSRMetadata, SSRResult } from "astro";
 import { fileURLToPath } from "url";
+import { runtime } from "./utils.js";
+import type { RenderDestination } from "astro/runtime/server/render/common.js";
 
 type CacheRenderingFn = (originalFn: typeof Runtime.createComponent) => typeof Runtime.createComponent;
 
@@ -24,6 +26,8 @@ function getCallSites(): NodeJS.CallSite[] {
   }
 }
 
+// const interceptSym = Symbol();
+
 export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string[]): CacheRenderingFn => (originalFn) => {
   debug('Render caching called with:', { routeEntrypoints });
 
@@ -31,20 +35,46 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
     const scriptPath = relative(root, fileURLToPath(getCallSites()[1]!.getScriptNameOrSourceURL()));
     const modulePath = relative(root, moduleId || '');
 
-    const cacheScope = `${modulePath}:${scriptPath}`.replaceAll('/', '__').replaceAll('.', '_');
+    const cacheScope = `${modulePath}:${scriptPath}`;
 
     if (typeof factoryOrOptions === 'function') {
-      return originalFn(cacheFn(cacheScope, factoryOrOptions), moduleId, propagation);
+      return originalFn(cacheFn(cacheScope, factoryOrOptions, moduleId), moduleId, propagation);
     }
 
     return originalFn({
       ...factoryOrOptions,
-      factory: cacheFn(cacheScope, factoryOrOptions.factory),
+      factory: cacheFn(cacheScope, factoryOrOptions.factory, factoryOrOptions.moduleId),
     });
   }
 
-  function cacheFn(cacheScope: string, factory: AstroComponentFactory): AstroComponentFactory {
+  function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
     return async (result: SSRResult, props, slots) => {
+      // if (!(result._metadata as any)[interceptSym]) {
+      //   Object.assign(result._metadata, { [interceptSym]: true });
+      //   const { propagators } = result._metadata;
+      //   const ref: any = {};
+      //   Object.defineProperty(result._metadata, 'propagators', {
+      //     get: () => {
+      //       debugger;
+      //       return ref.propagators;
+      //     },
+      //     set: (val) => {
+      //       if (ref.propagators) {
+      //         // Ref was already set
+      //         debugger;
+      //       }
+      //       ref.propagators = Object.assign(val, {
+      //         add: (...args: any[]) => {
+      //           debugger;
+      //           return Set.prototype.add.apply(val, args as any);
+      //         },
+      //       });
+      //     }
+      //   });
+      //
+      //   result._metadata.propagators = propagators;
+      // }
+
       if (slots !== undefined && Object.keys(slots).length > 0) return factory(result, props, slots);
 
       const resolvedProps = Object.fromEntries(await Promise.all(
@@ -66,66 +96,101 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
       const url = new URL(result.request.url);
 
       const hash = hashSum([result.compressHTML, result.params, url.pathname, url.search, resolvedProps]);
+      const cacheKey = `${cacheScope}:${hash}`;
 
-      let wasRefreshed = false;
+      const cachedValue = await cache.getRenderValue(
+        cacheKey,
+        () => factory(result, props, slots),
+      );
 
-      const cachedValue = await cache.getValue(`${cacheScope}:${hash}`, async () => {
-        wasRefreshed = true;
-        const previousExtraHeadLength = result._metadata.extraHead.length;
-        const renderedScriptsDiff = delayedSetDifference(result._metadata.renderedScripts);
-        const hasDirectivedDiff = delayedSetDifference(result._metadata.hasDirectives);
-        const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
+      const resultValue = cachedValue.value()
 
-        const value = await factory(result, props, slots);
+      if (resultValue instanceof Response) return resultValue;
 
-        return {
-          styles: result.styles,
-          scripts: result.scripts,
-          links: result.links,
-          componentMetadata: result.componentMetadata,
-          inlinedScripts: result.inlinedScripts,
-          metadata: () => ({
-            ...result._metadata,
-            extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
-            renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
-            hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
-            rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
-          }),
-          value,
-        };
-      });
+      const templateResult = runtime.isRenderTemplateResult(resultValue)
+        ? resultValue
+        : resultValue.content;
 
-      result.styles = cachedValue.styles;
-      result.scripts = cachedValue.scripts;
-      result.links = cachedValue.links;
-      result.componentMetadata = cachedValue.componentMetadata;
-      result.inlinedScripts = cachedValue.inlinedScripts;
+      const originalRender = templateResult.render;
 
-      if (!wasRefreshed) {
-        const cachedMetadata = cachedValue.metadata();
-        const newMetadata: SSRMetadata = {
-          ...cachedMetadata,
-          extraHead: result._metadata.extraHead.concat(cachedMetadata.extraHead),
-          renderedScripts: new Set([
-            ...result._metadata.renderedScripts.values(),
-            ...cachedMetadata.renderedScripts.values(),
-          ]),
-          hasDirectives: new Set([
-            ...result._metadata.hasDirectives.values(),
-            ...cachedMetadata.hasDirectives.values(),
-          ]),
-          rendererSpecificHydrationScripts: new Set([
-            ...result._metadata.rendererSpecificHydrationScripts.values(),
-            ...cachedMetadata.rendererSpecificHydrationScripts.values(),
-          ]),
-          propagators: result._metadata.propagators,
-        };
+      if (cachedValue.cached) {
+        const cachedMetadata = await cache.getMetadata(cacheKey);
+        if (!cachedMetadata) return factory(result, props, slots);
+        const { metadata } = cachedMetadata;
 
+        Object.assign(templateResult, {
+          render: (destination: RenderDestination) => {
+            // result.styles = cachedValue.styles;
+            // result.scripts = cachedValue.scripts;
+            // result.links = cachedValue.links;
+            // result.componentMetadata = cachedValue.componentMetadata;
+            // result.inlinedScripts = cachedValue.inlinedScripts;
 
-        result._metadata = newMetadata;
+            if (moduleId?.endsWith('TestStyle.astro')) {
+              debugger;
+            }
+
+            const newMetadata: SSRMetadata = {
+              ...metadata,
+              extraHead: result._metadata.extraHead.concat(metadata.extraHead),
+              renderedScripts: new Set([
+                ...result._metadata.renderedScripts.values(),
+                ...metadata.renderedScripts.values(),
+              ]),
+              hasDirectives: new Set([
+                ...result._metadata.hasDirectives.values(),
+                ...metadata.hasDirectives.values(),
+              ]),
+              rendererSpecificHydrationScripts: new Set([
+                ...result._metadata.rendererSpecificHydrationScripts.values(),
+                ...metadata.rendererSpecificHydrationScripts.values(),
+              ]),
+              propagators: result._metadata.propagators,
+            };
+
+            Object.assign(result._metadata, newMetadata);
+
+            return originalRender.call(templateResult, destination);
+          }
+        })
+
+        return resultValue;
       }
 
-      return cachedValue.value;
+      const previousExtraHeadLength = result._metadata.extraHead.length;
+      const renderedScriptsDiff = delayedSetDifference(result._metadata.renderedScripts);
+      const hasDirectivedDiff = delayedSetDifference(result._metadata.hasDirectives);
+      const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
+
+      Object.assign(templateResult, {
+        render: async (destination: RenderDestination) => {
+          // Renderer was not cached, so we need to cache the metadata as well
+
+          if (moduleId?.endsWith('TestStyle.astro')) {
+            debugger;
+          }
+
+          await cache.saveMetadata(cacheKey, {
+            styles: result.styles,
+            scripts: result.scripts,
+            links: result.links,
+            componentMetadata: result.componentMetadata,
+            inlinedScripts: result.inlinedScripts,
+            metadata: {
+              ...result._metadata,
+              extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
+              renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
+              hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
+              rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
+            },
+          });
+
+          return originalRender.call(templateResult, destination);
+        },
+      });
+
+
+      return resultValue;
     }
   }
 }

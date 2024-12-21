@@ -1,10 +1,10 @@
 import type { Plugin } from 'vite';
 import type { AstNode } from 'rollup';
 import { walk, type Node as ETreeNode } from 'estree-walker';
-import { rootDebug } from './debug.ts';
+import { rootDebug } from './debug.js';
 import { AstroError } from 'astro/errors';
-import { makeCaching } from './renderCaching.ts';
-import { Cache } from './cache.ts';
+import { makeCaching } from './renderCaching.js';
+import { Cache } from './cache.js';
 import { createResolver } from 'astro-integration-kit';
 import type { AstroConfig } from 'astro';
 import MagicString from 'magic-string';

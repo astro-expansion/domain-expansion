@@ -1,14 +1,59 @@
-import { rootDebug } from "./debug.ts";
-import { RenderFileStore, type PersistedValue, type PersistingValue } from "./renderFileStore.ts";
+import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
+import { rootDebug } from "./debug.js";
+import { Either, type Thunk } from "./utils.js";
+import { type PersistedMetadata, RenderFileStore } from "./renderFileStore.js";
 
 const debug = rootDebug.extend('cache');
 
 type MaybePromise<T> = Promise<T> | T;
 
-export class Cache {
-  private readonly inMemory = new Map<string, PersistedValue | null>();
+class MemoryCache<T> {
+  readonly #cache = new Map<string, Either<T, Promise<T>>>();
 
-  private readonly loading = new Map<string, Promise<PersistedValue | null>>();
+  public get(key: string): MaybePromise<T> | null {
+    const cached = this.#cache.get(key);
+
+    if (!cached) return null;
+    if (Either.isLeft(cached)) return cached.value;
+
+    return cached.value;
+  }
+
+  public storeSync(key: string, value: T): void {
+    this.#cache.set(key, Either.left(value));
+  }
+
+  public storeLoading(key: string, promise: Promise<T>): void {
+    // Use a 3-stage cache with a loading stage holding the promises
+    // to avoid duplicate reading from not caching the promise
+    // and memory leaks to only caching the promises.
+
+    const stored = Either.right(promise);
+    this.#cache.set(key, stored);
+    promise
+      .then(
+        result => {
+          const cached = this.#cache.get(key);
+          if (!Object.is(cached, stored)) return;
+          debug(`Storing cached render for "${key}"`);
+          this.#cache.set(key, Either.left(result));
+        }
+      )
+      .finally(() => {
+        const cached = this.#cache.get(key);
+        if (!Object.is(cached, stored)) return;
+        debug(`Clearing loading state for "${key}"`);
+        this.#cache.delete(key);
+      });
+  }
+}
+
+type ValueThunk = Thunk<AstroFactoryReturnValue>;
+
+export class Cache {
+  private readonly valueCache = new MemoryCache<Thunk<AstroFactoryReturnValue> | null>();
+
+  private readonly metadataCache = new MemoryCache<PersistedMetadata | null>();
 
   private readonly persisted: RenderFileStore;
 
@@ -18,67 +63,55 @@ export class Cache {
     this.persisted = new RenderFileStore(cacheDir);
   }
 
-  public async saveValue(key: string, factoryValue: PersistingValue): Promise<PersistingValue> {
-    const promise = this.persisted.persistValue(key, factoryValue);
-    this.storeLoadingStage(key, promise);
+  public saveRenderValue(key: string, factoryValue: AstroFactoryReturnValue): Promise<ValueThunk> {
+    const promise = this.persisted.saveRenderValue(key, factoryValue);
+    this.valueCache.storeLoading(key, promise);
+    return promise;
+  }
 
-    const { value } = await promise;
+  public async getRenderValue(
+    key: string,
+    loadFresh: Thunk<MaybePromise<AstroFactoryReturnValue>>,
+  ): Promise<{ cached: boolean, value: ValueThunk }> {
+    const value = await this.getStoredRenderValue(key);
+
+    if (value) return { cached: true, value };
+
     return {
-      ...factoryValue,
-      value: value(),
+      cached: false,
+      value: await this.saveRenderValue(key, await loadFresh()),
     };
   }
 
-  public async getValue(
-    key: string,
-    loadFresh: () => MaybePromise<PersistingValue>,
-  ): Promise<PersistingValue> {
-    const value = await this.getCachedRenderer(key);
-
-    if (value) return {
-      ...value,
-      metadata: () => value.metadata,
-      value: value.value(),
-    }
-
-    return this.saveValue(key, await loadFresh());
+  public saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+    const promise = this.persisted.saveMetadata(key, metadata);
+    this.metadataCache.storeSync(key, metadata);
+    return promise;
   }
 
-  private getCachedRenderer(key: string): Promise<PersistedValue | null> {
-    const fromMemory = this.inMemory.get(key);
-    if (fromMemory !== undefined) {
+  public async getMetadata(key: string,): Promise<PersistedMetadata | null> {
+    const fromMemory = this.metadataCache.get(key);
+    if (fromMemory) {
       debug(`Retrieve renderer for "${key}" from memory`);
-      return Promise.resolve(fromMemory);
+      return fromMemory;
     }
 
-    const loading = this.loading.get(key);
-    if (loading !== undefined) {
-      debug(`Retrieve renderer for "${key}" from loading stage`);
-      return loading;
-    }
-
-    // Use a 3-stage cache with a loading stage holding the promises
-    // to avoid duplicate reading from not caching the promise
-    // and memory leaks to only caching the promises.
-    const newPromise = this.persisted.loadRenderer(key);
-    this.storeLoadingStage(key, newPromise);
+    const newPromise = this.persisted.loadMetadata(key);
+    this.metadataCache.storeLoading(key, newPromise);
 
     return newPromise;
   }
 
-  private storeLoadingStage(key: string, promise: Promise<PersistedValue | null>): void {
-    this.loading.set(key, promise);
-    this.inMemory.delete(key);
-    promise
-      .then(
-        result => {
-          debug(`Storing cached render for "${key}"`);
-          this.inMemory.set(key, result);
-        }
-      )
-      .finally(() => {
-        debug(`Clearing loading state for "${key}"`);
-        this.loading.delete(key);
-      });
+  private getStoredRenderValue(key: string): MaybePromise<ValueThunk | null> {
+    const fromMemory = this.valueCache.get(key);
+    if (fromMemory) {
+      debug(`Retrieve renderer for "${key}" from memory`);
+      return fromMemory;
+    }
+
+    const newPromise = this.persisted.loadRenderer(key);
+    this.valueCache.storeLoading(key, newPromise);
+
+    return newPromise;
   }
 }

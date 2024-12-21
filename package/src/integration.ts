@@ -1,5 +1,5 @@
 import { addVitePlugin, defineIntegration } from "astro-integration-kit";
-import { interceptorPlugin } from "./interceptor.ts";
+import { interceptorPlugin } from "./interceptor.js";
 
 export const integration = defineIntegration({
 	name: "@domain-expansion/astro",

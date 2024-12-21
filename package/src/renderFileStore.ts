@@ -1,30 +1,15 @@
 import { createResolver } from "astro-integration-kit";
 import type { RenderDestination, RenderDestinationChunk } from "astro/runtime/server/render/common.js";
-import { rootDebug } from "./debug.ts";
-import type { HTMLBytes, HTMLString, RenderInstruction } from "astro/runtime/server/index.js";
-import type { SlotString } from "astro/runtime/server/render/slot.js";
+import { rootDebug } from "./debug.js";
 import { readFile, writeFile } from "fs/promises";
 import { mkdir } from "fs/promises";
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
-import type { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
-import type { isRenderTemplateResult, renderTemplate, RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
-import { Either } from "./either.ts";
+import { Either, runtime, type Thunk } from "./utils.js";
 import { createHash } from 'node:crypto';
-import type { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
 import type { SSRComponentMetadata, SSRElement, SSRMetadata } from "astro";
+import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
+import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
 
-type RuntimeInstances = {
-  HTMLBytes: typeof HTMLBytes,
-  HTMLString: typeof HTMLString,
-  SlotString: typeof SlotString,
-  createHeadAndContent: typeof createHeadAndContent,
-  isHeadAndContent: typeof isHeadAndContent,
-  renderTemplate: typeof renderTemplate,
-  isRenderTemplateResult: typeof isRenderTemplateResult,
-  createRenderInstruction: typeof createRenderInstruction,
-}
-
-const runtime: RuntimeInstances = ((globalThis as any)[Symbol.for('@domain-expansion:astro-runtime-instances')] = {} as RuntimeInstances);
 
 const NON_SERIALIZABLE_RENDER_INSTRUCTIONS = [
   'renderer-hydration-script',
@@ -75,24 +60,35 @@ type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializ
   [T in K]: ValueSerializationMap[T] & { type: T }
 }[K];
 
-export type PersistedValue = {
+export type PersistedMetadata = {
   styles: Set<SSRElement>,
   scripts: Set<SSRElement>,
   links: Set<SSRElement>,
   componentMetadata: Map<string, SSRComponentMetadata>,
   inlinedScripts: Map<string, string>,
   metadata: Omit<SSRMetadata, 'propagators'>,
-  value: ValueThunk,
 }
 
-export type PersistingValue = Omit<PersistedValue, 'value' | 'metadata'> & {
-  metadata: () => PersistedValue['metadata'],
-  value: AstroFactoryReturnValue,
-};
-
-export type ValueThunk = () => AstroFactoryReturnValue;
+export type SerializedMetadata = {
+  styles: Array<SSRElement>,
+  scripts: Array<SSRElement>,
+  links: Array<SSRElement>,
+  componentMetadata: Record<string, SSRComponentMetadata>,
+  inlinedScripts: Record<string, string>,
+  metadata: {
+    hasHydrationScript: boolean;
+    rendererSpecificHydrationScripts: Array<string>;
+    renderedScripts: Array<string>;
+    hasDirectives: Array<string>;
+    hasRenderedHead: boolean;
+    headInTree: boolean;
+    extraHead: string[];
+  }
+}
 
 const debug = rootDebug.extend('file-store');
+
+type ValueThunk = Thunk<AstroFactoryReturnValue>;
 
 export class RenderFileStore {
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
@@ -101,43 +97,59 @@ export class RenderFileStore {
     this.resolver = createResolver(cacheDir).resolve;
   }
 
-  public async persistValue(key: string, value: PersistingValue): Promise<PersistedValue> {
-    const { denormalized, clone } = await RenderFileStore.denormalizeValue(value.value);
-
-    const metadata = value.metadata();
+  public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
+    const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
       await writeFile(
-        await this.resolvePath(key),
-        JSON.stringify({
-          styles: Array.from(value.styles),
-          scripts: Array.from(value.scripts),
-          links: Array.from(value.links),
-          componentMetadata: Object.fromEntries(value.componentMetadata.entries()),
-          inlinedScripts: Object.fromEntries(value.inlinedScripts.entries()),
-          metadata: {
-            ...metadata,
-            hasDirectives: Array.from(metadata.hasDirectives),
-            renderedScripts: Array.from(metadata.renderedScripts),
-            rendererSpecificHydrationScripts: Array.from(metadata.rendererSpecificHydrationScripts),
-          },
-          value: denormalized,
-        }, null, 2),
+        await this.resolvePath(key + ':renderer'),
+        JSON.stringify(denormalized, null, 2),
         'utf-8'
       );
     }
 
-    return {
-      ...value,
-      metadata,
-      value: clone,
-    };
+    return clone;
   }
 
-  public async loadRenderer(key: string): Promise<PersistedValue | null> {
+  public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const serializedValue: Omit<PersistedValue, 'value'> & { value: SerializedValue } = JSON.parse(
-        await readFile(await this.resolvePath(key), 'utf-8'),
+      const serializedValue: SerializedValue = JSON.parse(
+        await readFile(await this.resolvePath(key + ':renderer'), 'utf-8'),
+      );
+
+      debug('Cache hit', key);
+
+      return RenderFileStore.normalizeValue(serializedValue);
+    } catch {
+      debug('Cache miss', key);
+      return null;
+    }
+  }
+
+  public async saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+    await writeFile(
+      await this.resolvePath(key + ':metadata'),
+      JSON.stringify({
+        styles: Array.from(metadata.styles),
+        scripts: Array.from(metadata.scripts),
+        links: Array.from(metadata.links),
+        componentMetadata: Object.fromEntries(metadata.componentMetadata.entries()),
+        inlinedScripts: Object.fromEntries(metadata.inlinedScripts.entries()),
+        metadata: {
+          ...metadata.metadata,
+          hasDirectives: Array.from(metadata.metadata.hasDirectives),
+          renderedScripts: Array.from(metadata.metadata.renderedScripts),
+          rendererSpecificHydrationScripts: Array.from(metadata.metadata.rendererSpecificHydrationScripts),
+        },
+      }, null, 2),
+      'utf-8'
+    );
+  }
+
+  public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
+    try {
+      const serializedValue: SerializedMetadata = JSON.parse(
+        await readFile(await this.resolvePath(key + ':metadata'), 'utf-8'),
       );
 
       debug('Cache hit', key);
@@ -154,7 +166,6 @@ export class RenderFileStore {
           renderedScripts: new Set(serializedValue.metadata.renderedScripts),
           rendererSpecificHydrationScripts: new Set(serializedValue.metadata.rendererSpecificHydrationScripts),
         },
-        value: RenderFileStore.normalizeValue(serializedValue.value),
       };
     } catch {
       debug('Cache miss', key);
@@ -166,7 +177,7 @@ export class RenderFileStore {
     const hash = createHash('sha3-224')
       .update(key, 'utf8')
       .digest('hex');
-    const pathSegments = hash.match(/.{1,64}/g)!;
+    const pathSegments = [hash.substring(0, 6), hash.substring(6)];
     const dir = this.resolver(...pathSegments.slice(0, -1));
     await mkdir(dir, { recursive: true });
 
