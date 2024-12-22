@@ -4,7 +4,7 @@ rm -rf */
 
 mkdir .results
 
-ROOT="$PWD"
+docker buildx build . -t domainexpansion-bench-image
 
 # git clone --depth 1 https://github.com/withastro/docs &
 # git clone --depth 1 https://github.com/zen-browser/www zen-browser &
@@ -14,6 +14,31 @@ git clone --depth 1 https://github.com/withstudiocms/ui &
 # git clone --depth 1 https://github.com/cloudflare/cloudflare-docs &
 
 wait
+
+docker run -i --rm --name studiocms-ui -v $PWD/ui:/app domainexpansion-bench-image bash <<EOF &
+cd /app/docs
+
+mkdir .results
+
+pnpm install
+pnpm build
+
+hyperfine \
+  --export-markdown .results/studiocms-ui.md \
+  -n '[StudioCMS UI Docs] Normal Build' \
+  'pnpm build' \
+  --prepare 'pnpm astro add @domain-expansion/astro -y && rm -rf ./node_modules/.domain-expansion' \
+  -n '[StudioCMS UI Docs] Domain Expansion (cold build)' \
+  'pnpm build' \
+  -n '[StudioCMS UI Docs] Domain Expansion (hot build)' \
+  'pnpm build'
+EOF
+
+wait
+
+cp -t .results */.results/*
+
+# rm -rf */
 
 # cd docs
 
@@ -50,21 +75,6 @@ wait
 #   'pnpm build' &
 
 # cd ../ui/docs
-
-cd ui/docs
-
-pnpm install &> /dev/null
-pnpm build &> /dev/null # Used as warmup to populate asset cache
-
-hyperfine \
-  --export-markdown ../../.results/studiocms-ui.md \
-  -n '[StudioCMS UI Docs] Normal Build' \
-  'pnpm build' \
-  --prepare 'pnpm astro add @domain-expansion/astro -y && rm -rf ./node_modules/.domain-expansion' \
-  -n '[StudioCMS UI Docs] Domain Expansion (cold build)' \
-  'pnpm build' \
-  -n '[StudioCMS UI Docs] Domain Expansion (hot build)' \
-  'pnpm build' &
 
 # cd ../../brutal
 
@@ -110,9 +120,3 @@ hyperfine \
 #   'npm run build' \
 #   -n '[Cloudflare Docs] Domain Expansion (hot build)' \
 #   'npm run build' &
-
-wait
-
-cd "$ROOT"
-
-rm -rf */
