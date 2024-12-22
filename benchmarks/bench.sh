@@ -20,8 +20,8 @@ wait
 # export NODE_OPTIONS=--max-old-space-size=8192
 # export SKIP_OG=true
 
-# pnpm install
-# pnpm build # Used as warmup to populate asset cache
+# pnpm install &> /dev/null
+# pnpm build &> /dev/null # Used as warmup to populate asset cache
 
 # hyperfine \
 #   --export-markdown ../.results/astro-docs.md \
@@ -36,8 +36,8 @@ wait
 
 # cd ../zen-browser
 
-# pnpm install
-# pnpm build # Used as warmup to populate asset cache
+# pnpm install &> /dev/null
+# pnpm build &> /dev/null # Used as warmup to populate asset cache
 
 # hyperfine \
 #   --export-markdown ../.results/zen-browser.md \
@@ -53,8 +53,8 @@ wait
 
 cd ui/docs
 
-pnpm install
-pnpm build # Used as warmup to populate asset cache
+pnpm install &> /dev/null
+pnpm build &> /dev/null # Used as warmup to populate asset cache
 
 hyperfine \
   --export-markdown ../../.results/studiocms-ui.md \
@@ -68,8 +68,8 @@ hyperfine \
 
 # cd ../../brutal
 
-# pnpm install
-# pnpm build # Used as warmup to populate asset cache
+# pnpm install &> /dev/null
+# pnpm build &> /dev/null # Used as warmup to populate asset cache
 
 # hyperfine \
 #   --export-markdown ../.results/brutal.md \
@@ -83,8 +83,8 @@ hyperfine \
 
 # cd ../starlight/docs
 
-# pnpm install
-# pnpm build # Used as warmup to populate asset cache
+# pnpm install &> /dev/null
+# pnpm build &> /dev/null # Used as warmup to populate asset cache
 
 # hyperfine \
 #   --export-markdown ../../.results/starlight.md \
@@ -98,8 +98,8 @@ hyperfine \
 
 # cd ../../cloudflare-docs
 
-# npm install
-# npm run build # Used as warmup to populate asset cache
+# npm install &> /dev/null
+# npm run build &> /dev/null # Used as warmup to populate asset cache
 
 # hyperfine \
 #   --export-markdown ../.results/cloudflare-docs.md \
