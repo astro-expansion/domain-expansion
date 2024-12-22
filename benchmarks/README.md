@@ -14,13 +14,13 @@ RAM: 32GB DDR4 3200MHz
 
 ## Getting Started
 
-First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file) for your system. You can find instructions in their README file. To make this benchmark, you also need to have `git` installed.
+First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file). You can find instructions in their README file. To run this benchmark, you also need to have `git` installed.
 
-Once installed, run the `bench.sh` file in this directory.
+Once installed, run the `bench.sh` script in this directory.
 
 ## What we benchmark
 
-We chose 6 open-source Astro projects with varying sizes:
+We chose 6 open-source Astro projects of varying sizes:
 
 1. [astro.build](https://astro.build), the official Astro website
 2. [docs.astro.build](https://docs.astro.build), the Astro docs and probably the biggest Astro-powered repository out there due to its translations
