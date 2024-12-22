@@ -1,4 +1,4 @@
-import { addIntegration, addVitePlugin, defineIntegration } from "astro-integration-kit";
+import { addIntegration, defineIntegration } from "astro-integration-kit";
 import { interceptorPlugin } from "./interceptor.js";
 import { collectMetrics } from "./metrics.js";
 import chalk from "chalk";
