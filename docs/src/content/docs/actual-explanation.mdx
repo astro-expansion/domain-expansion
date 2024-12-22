@@ -119,3 +119,26 @@ for on-demand pages and the extra code shipped is just those 4 lines (2 definiti
 
 During build, the render code runs in the same V8 isolate as the build process. This allows Domain Expansion to set a
 different wrapper to be used only during build without shipping that code in the bundle.
+
+### Bundling duplicates implementation
+
+Astro has a bunch of classes and functions exported from `astro/runtime`. The runtime is bundled in the project by Vite.
+This means that the instance used in the render code is not the same that an integration can import from `astro/runtime`,
+it's the same code but in two modules so `value instanceof RuntimeClass` doesn't work since those are different, albeit
+functionally idential, classes. We also need to reconstruct instances of those classes defined inside the bundle when
+loading from cache, but again we can't import them.
+
+To solve this problem, Domain Expansion also injects a little bit of extra code sending a reference to the runtime classes
+back from the bundle into the build integration while bundle is loaded. The code looks like this:
+
+```ts
+import {someRuntimeFunction, SomeRuntimeClass} from 'astro/runtime/something';
+
+Object.assign(
+  globalThis[<runtime transfer symbol>] ?? {},
+  {someRuntimeFunction, SomeRuntimeClass},
+);
+```
+
+For this, in the Domain Expansion integration code, we add an empty opject to the global scope under a private symbol
+and it gets populated with the values from within the bundle.
