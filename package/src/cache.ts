@@ -1,53 +1,11 @@
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { rootDebug } from "./debug.js";
-import { Either, type Thunk } from "./utils.js";
+import { type MaybePromise, type Thunk } from "./utils.js";
 import { type PersistedMetadata, RenderFileStore } from "./renderFileStore.js";
 import { inMemoryCacheHit, inMemoryCacheMiss } from "./metrics.js";
+import { MemoryCache } from "./inMemoryLRU.js";
 
 const debug = rootDebug.extend('cache');
-
-type MaybePromise<T> = Promise<T> | T;
-
-class MemoryCache<T> {
-  readonly #cache = new Map<string, Either<T, Promise<T>>>();
-
-  public get(key: string): MaybePromise<T> | null {
-    const cached = this.#cache.get(key);
-
-    if (!cached) return null;
-    if (Either.isLeft(cached)) return cached.value;
-
-    return cached.value;
-  }
-
-  public storeSync(key: string, value: T): void {
-    this.#cache.set(key, Either.left(value));
-  }
-
-  public storeLoading(key: string, promise: Promise<T>): void {
-    // Use a 3-stage cache with a loading stage holding the promises
-    // to avoid duplicate reading from not caching the promise
-    // and memory leaks to only caching the promises.
-
-    const stored = Either.right(promise);
-    this.#cache.set(key, stored);
-    promise
-      .then(
-        result => {
-          const cached = this.#cache.get(key);
-          if (!Object.is(cached, stored)) return;
-          debug(`Storing cached render for "${key}"`);
-          this.#cache.set(key, Either.left(result));
-        }
-      )
-      .finally(() => {
-        const cached = this.#cache.get(key);
-        if (!Object.is(cached, stored)) return;
-        debug(`Clearing loading state for "${key}"`);
-        this.#cache.delete(key);
-      });
-  }
-}
 
 type ValueThunk = Thunk<AstroFactoryReturnValue>;
 

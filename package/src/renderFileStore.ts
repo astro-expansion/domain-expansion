@@ -12,7 +12,8 @@ import type { RenderTemplateResult } from "astro/runtime/server/render/astro/ren
 import * as zlib from "node:zlib";
 import { promisify } from "node:util";
 import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
-import type { ContextTracking } from "./contextTracking.ts";
+import type { ContextTracking } from "./contextTracking.js";
+import { MemoryCache } from "./inMemoryLRU.js";
 
 const
   gzip = promisify(zlib.gzip),
@@ -88,6 +89,8 @@ const debug = rootDebug.extend('file-store');
 type ValueThunk = Thunk<AstroFactoryReturnValue>;
 
 export class RenderFileStore {
+  private readonly gzippedCache = new MemoryCache<Buffer>(Number.POSITIVE_INFINITY);
+
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
   public constructor(private readonly cacheDir: string) {
@@ -99,10 +102,17 @@ export class RenderFileStore {
     const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
+      const serializedData = Buffer.from(JSON.stringify(denormalized), 'utf-8');
+      trackStoredData(serializedData.byteLength);
+      const compressedData = await gzip(serializedData, { level: 9 });
+      trackStoredCompressedData(compressedData.byteLength);
+
+      const cacheKey = key + ':renderer';
+
+      this.gzippedCache.storeSync(cacheKey, compressedData);
       await writeFile(
-        await this.resolvePath(key + ':renderer'),
-        await gzip(Buffer.from(JSON.stringify(denormalized), 'utf-8'), { level: 9 }),
-        'utf-8'
+        await this.resolvePath(cacheKey),
+        compressedData,
       );
     }
 
@@ -111,11 +121,16 @@ export class RenderFileStore {
 
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const serializedValue: SerializedValue = JSON.parse(
-        (await gunzip(
-          await readFile(await this.resolvePath(key + ':renderer')),
-        )).toString('utf-8')
+      const cacheKey = key + ':renderer';
+      const storedData = await this.gzippedCache.load(
+        cacheKey,
+        async () => await readFile(await this.resolvePath(cacheKey)),
       );
+      trackLoadedCompressedData(storedData.byteLength);
+      const uncompressedData = await gunzip(storedData);
+      trackLoadedData(uncompressedData.byteLength);
+
+      const serializedValue: SerializedValue = JSON.parse(uncompressedData.toString('utf-8'));
 
       debug('Renderer cache hit', key);
       fsCacheHit();
@@ -146,15 +161,22 @@ export class RenderFileStore {
     const compressedData = await gzip(serializedData, { level: 9 });
     trackStoredCompressedData(compressedData.byteLength);
 
+    const cacheKey = key + ':metadata';
+
+    this.gzippedCache.storeSync(cacheKey, compressedData);
     await writeFile(
-      await this.resolvePath(key + ':metadata'),
+      await this.resolvePath(cacheKey),
       compressedData,
     );
   }
 
   public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
     try {
-      const storedData = await readFile(await this.resolvePath(key + ':metadata'));
+      const cacheKey = key + ':metadata';
+      const storedData = await this.gzippedCache.load(
+        cacheKey,
+        async () => await readFile(await this.resolvePath(cacheKey)),
+      );
       trackLoadedCompressedData(storedData.byteLength);
       const uncompressedData = await gunzip(storedData);
       trackLoadedData(uncompressedData.byteLength);

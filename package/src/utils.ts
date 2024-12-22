@@ -21,6 +21,8 @@ type RuntimeInstances = {
 
 export const runtime: RuntimeInstances = ((globalThis as any)[Symbol.for('@domain-expansion:astro-runtime-instances')] = {} as RuntimeInstances);
 
+export type MaybePromise<T> = Promise<T> | T;
+
 type Left<T> = { variant: 'left', value: T };
 type Right<T> = { variant: 'right', value: T };
 
