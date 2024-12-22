@@ -97,7 +97,7 @@ export const domainExpansionComponents = globalThis[{{internal component symbol}
 export const domainExpansionAssets = globalThis[{{internal assets symbol}}] ?? ((fn) => fn);
 ```
 
-Then it modify the definition of Astro's `createComponent` and `getImage` functions:
+Then it modifies the definition of Astro's `createComponent` and `getImage` functions:
 
 ```ts ins={2-3,6} del={1,5}
 function createComponent(...) {
