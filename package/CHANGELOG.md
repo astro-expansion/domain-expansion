@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- Sync versions
+
 ## 0.1.0-beta.1
 
 ### Minor Changes

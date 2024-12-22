@@ -2,7 +2,7 @@
   "name": "docs",
   "type": "module",
   "private": true,
-  "version": "0.0.1-beta.0",
+  "version": "0.0.1-beta.1",
   "scripts": {
     "dev": "astro dev",
     "start": "node ./dist/server/entry.mjs",
