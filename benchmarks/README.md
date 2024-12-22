@@ -18,6 +18,19 @@ First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-
 
 Once installed, run the `bench.sh` script in this directory.
 
+### Running specific benchmarks
+
+You can run the script with the `--exclude=...` flag to exclude certain benchmarks. The following values are valid to pass in:
+
+- `astro-docs`
+- `starlight`
+- `cloudflare-docs`
+- `studiocms-ui`
+- `brutal`
+- `zen-browser`
+
+For example, using `./bench.sh --exlude=astro-docs,cloudflare-docs` would exclude the two longest benchmarks!
+
 ## What we benchmark
 
 We chose 6 open-source Astro projects of varying sizes:
