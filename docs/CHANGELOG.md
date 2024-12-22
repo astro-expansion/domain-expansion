@@ -1,5 +1,12 @@
 # docs
 
+## 0.0.1-beta.0
+
+### Patch Changes
+
+- Updated dependencies [095445d]
+  - @domain-expansion/astro@0.1.0-beta.1
+
 ## 0.0.2-beta.0
 
 ### Patch Changes

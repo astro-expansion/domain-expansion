@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- 095445d: Cache invalidation
+
 ## 0.1.0-beta.0
 
 ### Minor Changes
