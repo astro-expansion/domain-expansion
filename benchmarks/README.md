@@ -2,6 +2,16 @@
 
 A benchmark using [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file). Used for the data we display on [domainexpansion.gg](https://domainexpansion.gg).
 
+## About the results
+
+The current results you find in `.results/` were created on Dec. 22, 2024 on a desktop PC with the following specs:
+
+```
+CPU: AMD Ryzen 9 5950X (32) @ 5,05 GHz
+RAM: 32GB DDR4 3200MHz
+(Storage: PCIE Gen.4 NVME SSD)
+```
+
 ## Getting Started
 
 First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file) for your system. You can find instructions in their README file. To make this benchmark, you also need to have `git` installed.
