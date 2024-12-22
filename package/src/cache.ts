@@ -22,46 +22,54 @@ export class Cache {
     this.persisted = new RenderFileStore(cacheDir);
   }
 
-  public saveRenderValue(
+  public saveRenderValue({ key, factoryValue, ...options }: {
     key: string,
     factoryValue: AstroFactoryReturnValue,
-    persist: boolean = true,
-  ): Promise<ValueThunk> {
-    const promise = persist
+    persist: boolean,
+    skipInMemory: boolean,
+  }): Promise<ValueThunk> {
+    const promise = options.persist
       ? this.persisted.saveRenderValue(key, factoryValue)
       : RenderFileStore.denormalizeValue(factoryValue).then(result => result.clone);
-    this.valueCache.storeLoading(key, promise);
+    if (!options.skipInMemory) this.valueCache.storeLoading(key, promise);
     return promise;
   }
 
-  public async getRenderValue(
+  public async getRenderValue({ key, loadFresh, ...options }: {
     key: string,
     loadFresh: Thunk<MaybePromise<AstroFactoryReturnValue>>,
-    persist: boolean = true,
-    force: boolean = false,
-  ): Promise<{ cached: boolean, value: ValueThunk }> {
-    const value = await this.getStoredRenderValue(key, force);
+    persist: boolean,
+    force: boolean,
+    skipInMemory: boolean
+  }): Promise<{ cached: boolean, value: ValueThunk }> {
+    const value = await this.getStoredRenderValue(key, options.force, options.skipInMemory);
 
     if (value) return { cached: true, value };
 
     return {
       cached: false,
-      value: await this.saveRenderValue(key, await loadFresh(), persist),
+      value: await this.saveRenderValue({
+        ...options,
+        key,
+        factoryValue: await loadFresh(),
+      }),
     };
   }
 
-  public async saveMetadata({ key, metadata, persist = true }: {
+  public saveMetadata({ key, metadata, persist, skipInMemory }: {
     key: string,
     metadata: PersistedMetadata,
-    persist: boolean
-  }): Promise<void> {
-    this.metadataCache.storeSync(key, metadata);
-    if (persist) {
-      await this.persisted.saveMetadata(key, metadata);
-    }
+    persist: boolean,
+    skipInMemory: boolean,
+  }): void {
+    if (!skipInMemory) this.metadataCache.storeSync(key, metadata);
+    if (persist) this.persisted.saveMetadata(key, metadata);
   }
 
-  public async getMetadata(key: string): Promise<PersistedMetadata | null> {
+  public async getMetadata({ key, skipInMemory }: {
+    key: string,
+    skipInMemory: boolean,
+  }): Promise<PersistedMetadata | null> {
     const fromMemory = this.metadataCache.get(key);
     if (fromMemory) {
       debug(`Retrieve metadata for "${key}" from memory`);
@@ -72,12 +80,12 @@ export class Cache {
     inMemoryCacheMiss();
 
     const newPromise = this.persisted.loadMetadata(key);
-    this.metadataCache.storeLoading(key, newPromise);
+    if (!skipInMemory) this.metadataCache.storeLoading(key, newPromise);
 
     return newPromise;
   }
 
-  private getStoredRenderValue(key: string, force: boolean): MaybePromise<ValueThunk | null> {
+  private getStoredRenderValue(key: string, force: boolean, skipInMemory: boolean): MaybePromise<ValueThunk | null> {
     const fromMemory = this.valueCache.get(key);
     if (fromMemory) {
       debug(`Retrieve renderer for "${key}" from memory`);
@@ -90,7 +98,7 @@ export class Cache {
     if (force) return null;
 
     const newPromise = this.persisted.loadRenderer(key);
-    this.valueCache.storeLoading(key, newPromise);
+    if (!skipInMemory) this.valueCache.storeLoading(key, newPromise);
 
     return newPromise;
   }

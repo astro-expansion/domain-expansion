@@ -19,7 +19,11 @@ const EXCLUDED_MODULE_IDS: string[] = [
   '\0astro:assets',
 ];
 
-export const interceptorPlugin = (routeEntrypoints: string[]): Plugin => {
+export const interceptorPlugin = (options: {
+  cacheComponents: false | 'in-memory' | 'persistent',
+  cachePages: boolean,
+  routeEntrypoints: string[],
+}): Plugin => {
   const componentHashes = new Map<string, string>();
 
   return {
@@ -29,9 +33,10 @@ export const interceptorPlugin = (routeEntrypoints: string[]): Plugin => {
       const { resolve: resolver } = createResolver(config.root);
 
       (globalThis as any)[Symbol.for('@domain-expansion:astro-component-caching')] = makeCaching({
+        ...options,
         cache: new Cache(resolver('node_modules/.domain-expansion')),
         root: config.root,
-        routeEntrypoints: routeEntrypoints.map(entrypoint => resolver(entrypoint)),
+        routeEntrypoints: options.routeEntrypoints.map(entrypoint => resolver(entrypoint)),
         componentHashes,
       });
     },

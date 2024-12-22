@@ -1,11 +1,9 @@
 import { createResolver } from "astro-integration-kit";
 import type { RenderDestination, RenderDestinationChunk } from "astro/runtime/server/render/common.js";
 import { rootDebug } from "./debug.js";
-import { readFile, writeFile } from "fs/promises";
-import { mkdir } from "fs/promises";
+import * as fs from 'node:fs';
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { Either, runtime, type Thunk } from "./utils.js";
-import { createHash } from 'node:crypto';
 import type { SSRMetadata } from "astro";
 import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
 import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
@@ -14,6 +12,8 @@ import { promisify } from "node:util";
 import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
 import type { ContextTracking } from "./contextTracking.js";
 import { MemoryCache } from "./inMemoryLRU.js";
+import { Lazy } from "@inox-tools/utils/lazy";
+import murmurHash from "murmurhash-native";
 
 const
   gzip = promisify(zlib.gzip),
@@ -93,8 +93,18 @@ export class RenderFileStore {
 
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
+  private readonly knownFiles = Lazy.of(() => {
+    if (!fs.existsSync(this.cacheDir)) return Promise.resolve([]);
+
+    return fs.promises.readdir(this.cacheDir, {
+      recursive: true,
+      withFileTypes: false,
+    });
+  });
+
   public constructor(private readonly cacheDir: string) {
     this.resolver = createResolver(this.cacheDir).resolve;
+    fs.mkdirSync(this.cacheDir, { recursive: true });
   }
 
   public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
@@ -102,18 +112,7 @@ export class RenderFileStore {
     const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
-      const serializedData = Buffer.from(JSON.stringify(denormalized), 'utf-8');
-      trackStoredData(serializedData.byteLength);
-      const compressedData = await gzip(serializedData, { level: 9 });
-      trackStoredCompressedData(compressedData.byteLength);
-
-      const cacheKey = key + ':renderer';
-
-      this.gzippedCache.storeSync(cacheKey, compressedData);
-      await writeFile(
-        await this.resolvePath(cacheKey),
-        compressedData,
-      );
+      this.store(key + ':renderer', denormalized);
     }
 
     return clone;
@@ -121,16 +120,12 @@ export class RenderFileStore {
 
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const cacheKey = key + ':renderer';
-      const storedData = await this.gzippedCache.load(
-        cacheKey,
-        async () => await readFile(await this.resolvePath(cacheKey)),
-      );
-      trackLoadedCompressedData(storedData.byteLength);
-      const uncompressedData = await gunzip(storedData);
-      trackLoadedData(uncompressedData.byteLength);
+      const serializedValue: SerializedValue | null = await this.load(key + ':renderer');
 
-      const serializedValue: SerializedValue = JSON.parse(uncompressedData.toString('utf-8'));
+      if (!serializedValue) {
+        debug('Renderer cache miss', key);
+        return null;
+      }
 
       debug('Renderer cache hit', key);
       fsCacheHit();
@@ -143,7 +138,7 @@ export class RenderFileStore {
     }
   }
 
-  public async saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+  public saveMetadata(key: string, metadata: PersistedMetadata): void {
     debug('Persisting metadata for ', key);
 
     const serialized: SerializedMetadata = {
@@ -156,32 +151,16 @@ export class RenderFileStore {
       },
     };
 
-    const serializedData = Buffer.from(JSON.stringify(serialized), 'utf-8');
-    trackStoredData(serializedData.byteLength);
-    const compressedData = await gzip(serializedData, { level: 9 });
-    trackStoredCompressedData(compressedData.byteLength);
-
-    const cacheKey = key + ':metadata';
-
-    this.gzippedCache.storeSync(cacheKey, compressedData);
-    await writeFile(
-      await this.resolvePath(cacheKey),
-      compressedData,
-    );
+    this.store(key + ':metadata', serialized);
   }
 
   public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
     try {
-      const cacheKey = key + ':metadata';
-      const storedData = await this.gzippedCache.load(
-        cacheKey,
-        async () => await readFile(await this.resolvePath(cacheKey)),
-      );
-      trackLoadedCompressedData(storedData.byteLength);
-      const uncompressedData = await gunzip(storedData);
-      trackLoadedData(uncompressedData.byteLength);
-
-      const serializedValue: SerializedMetadata = JSON.parse(uncompressedData.toString('utf-8'));
+      const serializedValue: SerializedMetadata | null = await this.load(key + ':metadata');
+      if (!serializedValue) {
+        debug('Metadata cache miss', key);
+        return null;
+      }
 
       debug('Metadata cache hit', key);
       fsCacheHit();
@@ -202,15 +181,39 @@ export class RenderFileStore {
     }
   }
 
-  private async resolvePath(key: string): Promise<string> {
-    const hash = createHash('sha3-224')
-      .update(key, 'utf8')
-      .digest('hex');
-    const pathSegments = [hash.substring(0, 6), hash.substring(6)];
-    const dir = this.resolver(...pathSegments.slice(0, -1));
-    await mkdir(dir, { recursive: true });
+  private store(cacheKey: string, data: any): void {
+    setTimeout(async () => {
+      try {
+        const serializedData = Buffer.from(JSON.stringify(data), 'utf-8');
+        trackStoredData(serializedData.byteLength);
+        const compressedData = await gzip(serializedData, { level: 9 });
+        trackStoredCompressedData(compressedData.byteLength);
 
-    return this.resolver(...pathSegments);
+        this.gzippedCache.storeSync(cacheKey, compressedData);
+        await fs.promises.writeFile(
+          this.resolver(murmurHash.murmurHash64(cacheKey)),
+          compressedData,
+        );
+      } catch (err) {
+        debug('Failed to persist data', err);
+      }
+    });
+  }
+
+  private async load(cacheKey: string): Promise<any> {
+    const knownFiles = await this.knownFiles.get();
+    const hash = murmurHash.murmurHash64(cacheKey);
+    if (!knownFiles.includes(hash)) return null;
+
+    const storedData = await this.gzippedCache.load(
+      cacheKey,
+      async () => await fs.promises.readFile(this.resolver(hash)),
+    );
+    trackLoadedCompressedData(storedData.byteLength);
+    const uncompressedData = await gunzip(storedData);
+    trackLoadedData(uncompressedData.byteLength);
+
+    return JSON.parse(uncompressedData.toString('utf-8'));
   }
 
   public static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {

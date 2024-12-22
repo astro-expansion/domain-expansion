@@ -20,11 +20,13 @@ interface ExtendedSSRResult extends SSRResult {
   [ASSET_SERVICE_CALLS]: PersistedMetadata['assetServiceCalls'];
 }
 
-export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
+export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cacheOptions }: {
   cache: Cache,
   root: string,
   routeEntrypoints: string[],
   componentHashes: Map<string, string>,
+  cacheComponents: false | 'in-memory' | 'persistent',
+  cachePages: boolean,
 }): CacheRenderingFn => (originalFn) => {
   debug('Render caching called with:', { routeEntrypoints });
 
@@ -62,6 +64,15 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
+    const isEntrypoint = routeEntrypoints.includes(moduleId!);
+    const cacheParams: Record<'persist' | 'skipInMemory', boolean> = {
+      persist: (
+        (isEntrypoint && cacheOptions.cachePages)
+        || (!isEntrypoint && cacheOptions.cacheComponents === 'persistent')
+      ),
+      skipInMemory: isEntrypoint || cacheOptions.cacheComponents !== false,
+    };
+
     return async (result: ExtendedSSRResult, props, slots) => {
       const context = getCurrentContext();
 
@@ -70,6 +81,8 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
           context.nestedComponents[moduleId] = componentHashes.get(moduleId)!;
         }
       }
+
+      if (!cacheParams.persist && cacheParams.skipInMemory) return factory(result, props, slots);
 
       if (slots !== undefined && Object.keys(slots).length > 0) {
         debug('Skip caching of component instance with children', { moduleId });
@@ -104,14 +117,12 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
       return enterTrackingScope(async () => {
         const cachedMetadata = await getValidMetadata(cacheKey);
 
-        const isEntrypoint = routeEntrypoints.includes(moduleId!);
-
-        const cachedValue = await cache.getRenderValue(
-          cacheKey,
-          () => factory(result, props, slots),
-          isEntrypoint,
-          !cachedMetadata,
-        );
+        const cachedValue = await cache.getRenderValue({
+          key: cacheKey,
+          loadFresh: () => factory(result, props, slots),
+          force: !cachedMetadata,
+          ...cacheParams,
+        });
 
         const resultValue = cachedValue.value()
 
@@ -166,7 +177,7 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
 
             const context = collectTracking();
 
-            await cache.saveMetadata({
+            cache.saveMetadata({
               key: cacheKey,
               metadata: {
                 ...context,
@@ -178,7 +189,7 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
                   rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
                 },
               },
-              persist: !context.doNotCache && isEntrypoint,
+              ...cacheParams,
             });
 
             return originalRender.call(templateResult, destination);
@@ -188,33 +199,36 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
         return resultValue;
       });
     }
-  }
 
-  async function getValidMetadata(cacheKey: string): Promise<PersistedMetadata | null> {
-    const cachedMetadata = await cache.getMetadata(cacheKey);
-    if (!cachedMetadata) return null;
+    async function getValidMetadata(cacheKey: string): Promise<PersistedMetadata | null> {
+      const cachedMetadata = await cache.getMetadata({
+        key: cacheKey,
+        ...cacheParams,
+      });
+      if (!cachedMetadata) return null;
 
-    for (const [component, hash] of Object.entries(cachedMetadata.nestedComponents)) {
-      const currentHash = componentHashes.get(component);
-      if (currentHash !== hash) return null;
-    }
-
-    for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
-      debug('Replaying getImage call', { options, config });
-      const result = await runtime.getImage(options, config);
-
-      if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
-        debug('Image call mismatch, bailing out of cache');
-        return null;
+      for (const [component, hash] of Object.entries(cachedMetadata.nestedComponents)) {
+        const currentHash = componentHashes.get(component);
+        if (currentHash !== hash) return null;
       }
-    }
 
-    for (const entry of cachedMetadata.renderEntryCalls) {
-      const currentHash = await computeEntryHash(entry.filePath);
-      if (currentHash !== entry.hash) return null;
-    }
+      for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
+        debug('Replaying getImage call', { options, config });
+        const result = await runtime.getImage(options, config);
 
-    return cachedMetadata;
+        if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
+          debug('Image call mismatch, bailing out of cache');
+          return null;
+        }
+      }
+
+      for (const entry of cachedMetadata.renderEntryCalls) {
+        const currentHash = await computeEntryHash(entry.filePath);
+        if (currentHash !== entry.hash) return null;
+      }
+
+      return cachedMetadata;
+    }
   }
 }
 
