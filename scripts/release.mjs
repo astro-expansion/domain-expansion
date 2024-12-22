@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -41,7 +42,7 @@ const main = async () => {
 			otp: { type: "string" }
 		}
 	});
-	
+
 	await run("pnpm changeset version");
 	await run("git add .");
 	await run('git commit -m "chore: update version"');

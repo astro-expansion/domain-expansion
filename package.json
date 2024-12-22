@@ -1,32 +1,27 @@
 {
-	"name": "root",
-	"private": true,
-	"packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
-	"engines": {
-		"node": ">=18.20.3"
-	},
-	"scripts": {
-		"package:build": "pnpm -r --filter @domain-expansion/astro build",
-		"package:dev": "pnpm -r --filter @domain-expansion/astro dev",
-		"playground:dev": "pnpm --filter playground dev",
-		"playground:build": "pnpm --filter playground build",
-		"docs:dev": "pnpm --filter docs dev",
-		"docs:build": "pnpm --filter docs build",
-		"docs:start": "pnpm --filter docs start",
-		"dev": "pnpm --stream -r -parallel dev",
-		"changeset": "changeset",
-		"release": "node scripts/release.mjs",
-		"lint": "biome check .",
-		"lint:fix": "biome check --apply ."
-	},
-	"devDependencies": {
-		"@biomejs/biome": "1.9.4",
-		"@changesets/cli": "^2.27.10"
-	},
-	"pnpm": {
-		"patchedDependencies": {
-			"astro": "patches/astro.patch",
-			"@astrojs/starlight": "patches/@astrojs__starlight.patch"
-		}
-	}
+  "name": "root",
+  "private": true,
+  "packageManager": "pnpm@9.15.0+sha512.76e2379760a4328ec4415815bcd6628dee727af3779aaa4c914e3944156c4299921a89f976381ee107d41f12cfa4b66681ca9c718f0668fa0831ed4c6d8ba56c",
+  "engines": {
+    "node": ">=18.20.3"
+  },
+  "scripts": {
+    "package:build": "pnpm -r --filter @domain-expansion/astro build",
+    "package:dev": "pnpm -r --filter @domain-expansion/astro dev",
+    "playground:dev": "pnpm --filter playground dev",
+    "playground:build": "pnpm --filter playground build",
+    "docs:dev": "pnpm --filter docs dev",
+    "docs:build": "pnpm --filter docs build",
+    "docs:start": "pnpm --filter docs start",
+    "dev": "pnpm --stream -r -parallel dev",
+    "changeset": "changeset",
+    "release": "node scripts/release.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --apply ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@changesets/cli": "^2.27.11"
+  },
+  "pnpm": {}
 }
