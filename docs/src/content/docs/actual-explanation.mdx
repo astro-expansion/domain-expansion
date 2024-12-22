@@ -125,7 +125,7 @@ different wrapper to be used only during build without shipping that code in the
 Astro has a bunch of classes and functions exported from `astro/runtime`. The runtime is bundled in the project by Vite.
 This means that the instance used in the render code is not the same that an integration can import from `astro/runtime`,
 it's the same code but in two modules so `value instanceof RuntimeClass` doesn't work since those are different, albeit
-functionally idential, classes. We also need to reconstruct instances of those classes defined inside the bundle when
+functionally identical, classes. We also need to reconstruct instances of those classes defined inside the bundle when
 loading from cache, but again we can't import them.
 
 To solve this problem, Domain Expansion also injects a little bit of extra code sending a reference to the runtime classes
@@ -140,5 +140,5 @@ Object.assign(
 );
 ```
 
-For this, in the Domain Expansion integration code, we add an empty opject to the global scope under a private symbol
+For this, in the Domain Expansion integration code, we add an empty object to the global scope under a private symbol
 and it gets populated with the values from within the bundle.
