@@ -6,6 +6,7 @@ COPY package.json /app/package.json
 COPY pnpm-lock.yaml /app/pnpm-lock.yaml
 COPY pnpm-workspace.yaml /app/pnpm-workspace.yaml
 
+COPY ./patches /app/patches
 COPY ./package /app/package
 COPY ./docs /app/docs
 
@@ -19,4 +20,6 @@ RUN corepack enable
 RUN pnpm install
 RUN pnpm build
 
-CMD ["pnpm", "start"]
+EXPOSE 4321:4321
+
+CMD ["export HOST=0.0.0.0;", "pnpm", "start"]

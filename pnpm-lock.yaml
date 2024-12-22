@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@astrojs/starlight':
+    hash: xpkvjlyeyzzjyd5k2zswagd7um
+    path: patches/@astrojs__starlight.patch
+
 importers:
 
   .:
@@ -22,22 +27,22 @@ importers:
         version: 9.0.0(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       '@astrojs/starlight':
         specifier: ^0.30.0
-        version: 0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
+        version: 0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       '@domain-expansion/astro':
         specifier: workspace:^
         version: link:../package
       astro:
-        specifier: ^5.0.2
+        specifier: ^5.0.8
         version: 5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)
       sharp:
         specifier: ^0.32.5
         version: 0.32.6
       starlight-image-zoom:
         specifier: ^0.9.0
-        version: 0.9.0(@astrojs/starlight@0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))
+        version: 0.9.0(@astrojs/starlight@0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))
       starlight-theme-catppuccin:
         specifier: ^2.0.0
-        version: 2.0.0(@astrojs/starlight@0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
+        version: 2.0.0(@astrojs/starlight@0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
 
   package:
     dependencies:
@@ -47,9 +52,6 @@ importers:
       astro:
         specifier: ^5.0.0
         version: 5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)
-      astro-integration-kit:
-        specifier: ^0.17.0
-        version: 0.17.0(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       chalk:
         specifier: ^5.4.1
         version: 5.4.1
@@ -84,6 +86,9 @@ importers:
       '@types/node':
         specifier: ^22.10.2
         version: 22.10.2
+      astro-integration-kit:
+        specifier: ^0.17.0
+        version: 0.17.0(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       rollup:
         specifier: ^4.29.0
         version: 4.29.1
@@ -3684,7 +3689,7 @@ snapshots:
       stream-replace-string: 2.0.0
       zod: 3.24.1
 
-  '@astrojs/starlight@0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))':
+  '@astrojs/starlight@0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))':
     dependencies:
       '@astrojs/mdx': 4.0.2(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       '@astrojs/sitemap': 3.2.1
@@ -7039,16 +7044,16 @@ snapshots:
 
   sprintf-js@1.0.3: {}
 
-  starlight-image-zoom@0.9.0(@astrojs/starlight@0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))):
+  starlight-image-zoom@0.9.0(@astrojs/starlight@0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))):
     dependencies:
-      '@astrojs/starlight': 0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
+      '@astrojs/starlight': 0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       rehype-raw: 7.0.0
       unist-util-visit: 5.0.0
       unist-util-visit-parents: 6.0.1
 
-  starlight-theme-catppuccin@2.0.0(@astrojs/starlight@0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)):
+  starlight-theme-catppuccin@2.0.0(@astrojs/starlight@0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)))(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)):
     dependencies:
-      '@astrojs/starlight': 0.30.3(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
+      '@astrojs/starlight': 0.30.3(patch_hash=xpkvjlyeyzzjyd5k2zswagd7um)(astro@5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1))
       astro: 5.1.1(@types/node@22.10.2)(jiti@2.4.2)(rollup@4.29.1)(typescript@5.7.2)(yaml@2.6.1)
 
   statuses@2.0.1: {}

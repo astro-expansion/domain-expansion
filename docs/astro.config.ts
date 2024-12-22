@@ -10,6 +10,9 @@ import starlightImageZoomPlugin from 'starlight-image-zoom';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://domainexpansion.gg',
+	server: {
+		host: '0.0.0.0'
+	},
 	integrations: [
 		domainExpansion(),
 		starlight({
