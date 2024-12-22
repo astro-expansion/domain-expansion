@@ -8,10 +8,10 @@ Domain Expansion works under the hood.
 ## How Astro builds your site
 
 Whenever you run `astro build`, Astro will essentially "request" your components internally and save the 
-resulting HTML. This happens with two functions, `$$render` and `$$renderComponent`. The first one is used to render 
-the whole component, while the latter is used to render nested components. You can see the output of these 
-functions on [the live Astro compiler](https://live-astro-compiler.vercel.app/). The output of a component from the compiler 
-will look somewhat like this:
+resulting HTML. This is done using a function called `$$createComponent`. This function takes in a callback 
+(the compiled version of your component) and turns it into an instance of a component. That instance is then called
+each time the component is rendered, with your properties, slots and so on. 
+You can see how this looks internally in the Astro runtime [here](https://live-astro-compiler.vercel.app/):
 
 ```ts
 import {
@@ -49,27 +49,22 @@ return $$render`${$$maybeRenderHead($$result)}<div>
 export default $$stdin;
 
 ```
-
-You can see how the `$$renderComponent` template tag is used to render the components `Foo` and `Bar`,
-while the `$$render` template tag is used to render the whole component or children of components which
-themselves do not contain any further child components.
+You can see how the `$$createComponent` function takes in the callback, which returns a few
+template tags, essentially the rendered components.
 
 ## Intercepting the build process
 
 When you install Domain Expansion and add the integration, it adds a Vite plugin. This plugin essentially
-just replaces the `$$render` and `$$renderComponent` functions with its own versions. The new `$$render` 
-function checks the cache based on a hash of the component which is calling `$$render`. If the hash is the
-same as the one in the cache, we can be sure that the content hasn't changed, so we can just return the cached
-content. If the hash is different, we need to render the content again and save it to the cache.
-
-The `$$renderComponent` function works in a similar way, although there are two different scenarios here.
-
-First, if the component has no children (it is self-closing, like this: `<Foo />`), we compute the hash
-based on the name of the component and the props. If neither changed, we can return the cached content, if not,
-we simply re-render it.
-
-Second, if the component has children, we also include the hash of the parent component, which then gets
-included in the hash along with the component name and its props. Again, if the hash is the same, we can
-return the cached content, if not, we render the component and save it to the cache.
+just wraps the `$$createComponent` function to add extra behavior before and after your component renders.
+That extra behavior allows us to cache all information about each use of your component, such that, whenever
+it is built again without any changes to the source code, props or slots, we just return the cached content.
 
 The cache is saved in `node_modules/.domain-expansion`.
+
+## What about assets?
+
+Astro has built-in image optimization. That built-in image optimization adds the resulting asset to your build
+output based on calls to the `getImage` function. That function is also used in the `<Image />` and `<Picture />`
+components. Domain Expansion detects when that function is called and also adds the parameters that the function
+was called with to the cache. Whenever we reconstruct a component from the cache, we "replay" all calls to `getImage`	
+such that the image service is called just as if the component was rendered normally.

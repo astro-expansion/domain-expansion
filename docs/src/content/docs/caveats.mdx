@@ -1,0 +1,26 @@
+---
+title: Caveats
+---
+
+## Engines
+Domain Expansion is *very* particular about its environment. For example, if you use any runtime besides Node.js,
+you **will** run into issues. This is because Domain Expansion relies on functions that are only available in V8,
+the runtime that Node.js uses.
+
+If you use any runtime besides Node.js for building, Domain Expansion will not work. However, you are not required
+to deploy to Node.js! After the build process is complete, any Astro-compatible runtime can be used to serve the
+site.
+
+## Global State
+If you have components with global state, they might behave in weird ways, as Domain Expansion is unable to cache any
+shared state between components, because every component is built in isolation. This means that when retrieving a 
+component from the cache, none if its side effects will be able to be recreated.
+
+## Astro Versions
+
+Domain Expansion relies on how two very functions are exported from Astro. Specifically where and how `$$createComponent`
+and `getImage` are declared and exported from. If these functions are moved or changed in any way, Domain Expansion
+will break. Since those functions are part of Astro's internal API, they can change at any time, even on patch releases.
+
+If you find yourself having any issues with Domain Expansion, please open an issue on the 
+[GitHub repository](https://github.com/astro-expansion/domain-expansion).
