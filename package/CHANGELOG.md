@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- 1278f19: Fix bundling unused dependencies
+
 ## 0.1.0-beta.3
 
 ### Minor Changes

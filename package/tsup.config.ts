@@ -18,7 +18,10 @@ export default defineConfig((options) => {
 			...Object.keys(peerDependencies),
 			...Object.keys(dependencies),
 			/node_modules/g,
+			'recast',
+			'tslib',
 		],
 		tsconfig: "tsconfig.json",
+		treeshake: 'smallest',
 	};
 });
