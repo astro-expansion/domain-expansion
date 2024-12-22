@@ -66,6 +66,7 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
 
       if (slots !== undefined && Object.keys(slots).length > 0) return factory(result, props, slots);
 
+      // TODO: Handle edge-cases involving Object.defineProperty
       const resolvedProps = Object.fromEntries((await Promise.all(
         Object.entries(props)
           .map(async ([key, value]) => [key, types.isProxy(value) ? undefined : await value])
