@@ -3,12 +3,21 @@ title: Domain Expansion
 description: And they said incremental builds in Astro weren't possible.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
-import TestStyle from '../../component/TestStyle.astro';
+import { Tabs, TabItem, Badge } from '@astrojs/starlight/components';
 
-<TestStyle />
+Domain Expansion is an Astro integration that adds support for incremental builds. Basically,
+builds go weee now.
 
-Domain Expansion is an Astro integration that adds support for incremental builds.
+## Benchmarks
+
+<Badge text="TODO: PUT GRAFANA BENCHMARKS HERE" />
+
+1. Astro Docs, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
+2. Starlight docs, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
+3. astro.build, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
+4. Astrowind basic install, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
+5. Cloudflare docs, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
+6. StudioCMS/UI Docs, time to build (domain expansion vs domain expansion (no logging) vs default vs default (no logging))
 
 ## Installation
 
@@ -74,6 +83,11 @@ export default defineConfig({
 Once the integration has been included in your `astro.config.mjs`, the next time you build your site,
 your build will be cached. From that point on, whenever you rebuild your site, only the files that have
 changed will be rebuilt.
+
+### Even more optimization
+
+1. Set `logLevel` to `silent` in your `astro.config.mjs` to disable logging. See the [benchmarks](#benchmarks) for more information.
+2. Pray that [Rolldown](https://rolldown.rs/) gets released soon.
 
 ## Authors
 

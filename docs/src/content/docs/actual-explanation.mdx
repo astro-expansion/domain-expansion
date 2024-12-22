@@ -64,7 +64,9 @@ The cache is saved in `node_modules/.domain-expansion`.
 ## What about assets?
 
 Astro has built-in image optimization. That built-in image optimization adds the resulting asset to your build
-output based on calls to the `getImage` function. That function is also used in the `<Image />` and `<Picture />`
+output based on calls to the [`getImage` function](https://docs.astro.build/en/guides/images/#generating-images-with-getimage). 
+That function is also used in the [`<Image />`](https://docs.astro.build/en/guides/images/#display-optimized-images-with-the-image--component) 
+and [`<Picture />`](https://docs.astro.build/en/reference/modules/astro-assets/#picture-)
 components. Domain Expansion detects when that function is called and also adds the parameters that the function
 was called with to the cache. Whenever we reconstruct a component from the cache, we "replay" all calls to `getImage`	
 such that the image service is called just as if the component was rendered normally.

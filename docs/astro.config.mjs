@@ -21,6 +21,8 @@ export default defineConfig({
 				{ label: 'Installation', slug: '' },
 				{ label: 'The Tale of the Three Mages', slug: 'the-tale-of-the-three-mages' },
 				{ label: 'An actual explanation of what is going on here', slug: 'actual-explanation' },
+				{ label: 'Caveats', slug: 'caveats' },
+				{ label: 'El funny', slug: 'memes' },
 			],
 			plugins: [
 				catppuccin({ dark: 'mocha-teal', light: 'latte-teal' }),
