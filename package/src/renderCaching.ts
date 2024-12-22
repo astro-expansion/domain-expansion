@@ -2,36 +2,17 @@ import type * as Runtime from "astro/compiler-runtime";
 import hashSum from "hash-sum";
 import { Cache } from "./cache.js";
 import { rootDebug } from "./debug.js";
-import { relative } from 'pathe';
 import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import type { SSRMetadata, SSRResult } from "astro";
-import { fileURLToPath } from "url";
 import { runtime } from "./utils.js";
 import type { RenderDestination } from "astro/runtime/server/render/common.js";
-import type { PersistedMetadata } from "./renderFileStore.ts";
-import type { getImage } from "astro/assets";
-import { Lazy } from "@inox-tools/utils/lazy";
-import { isDeepStrictEqual, types } from "util";
-import { AsyncLocalStorage } from "async_hooks";
-
-type GetImageFn = typeof getImage;
+import type { PersistedMetadata } from "./renderFileStore.js";
+import { isDeepStrictEqual, types } from "node:util";
+import { computeEntryHash, getCurrentContext, makeContextTracking } from "./contextTracking.js";
 
 type CacheRenderingFn = (originalFn: typeof Runtime.createComponent) => typeof Runtime.createComponent;
 
 const debug = rootDebug.extend('render-caching');
-
-function getCallSites(): NodeJS.CallSite[] {
-  const previous = Error.prepareStackTrace;
-  try {
-    Error.prepareStackTrace = (_, css) => {
-      return css;
-    }
-
-    return (new Error().stack as unknown as NodeJS.CallSite[]).slice(1);
-  } finally {
-    Error.prepareStackTrace = previous;
-  }
-}
 
 const ASSET_SERVICE_CALLS = Symbol('@domain-expansion:astro-assets-service-calls');
 
@@ -39,32 +20,61 @@ interface ExtendedSSRResult extends SSRResult {
   [ASSET_SERVICE_CALLS]: PersistedMetadata['assetServiceCalls'];
 }
 
-export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string[]): CacheRenderingFn => (originalFn) => {
+export const makeCaching = ({ cache, routeEntrypoints, componentHashes }: {
+  cache: Cache,
+  root: string,
+  routeEntrypoints: string[],
+  componentHashes: Map<string, string>,
+}): CacheRenderingFn => (originalFn) => {
   debug('Render caching called with:', { routeEntrypoints });
 
   return (factoryOrOptions, moduleId, propagation) => {
-    const scriptPath = relative(root, fileURLToPath(getCallSites()[1]!.getScriptNameOrSourceURL()));
-    const modulePath = relative(root, moduleId || '');
+    const options = typeof factoryOrOptions === 'function'
+      ? { factory: factoryOrOptions, moduleId, propagation } as Exclude<typeof factoryOrOptions, Function>
+      : factoryOrOptions;
 
-    const cacheScope = `${modulePath}:${scriptPath}`;
+    const context = getCurrentContext();
 
-    if (typeof factoryOrOptions === 'function') {
-      return originalFn(cacheFn(cacheScope, factoryOrOptions, moduleId), moduleId, propagation);
+    let cacheScope = options.moduleId || '';
+
+    if (!options.moduleId || !componentHashes.has(options.moduleId)) {
+      if (!context) return originalFn(options);
+      delete options.moduleId;
+
+      if (!context.renderingEntry) {
+        context.doNotCache = true;
+        return originalFn(options);
+      }
+
+      const ccRenderCall = context.renderEntryCalls.at(-1)!;
+      cacheScope = `ccEntry:${ccRenderCall.id}:${ccRenderCall.hash}`;
+    } else {
+      const hash = componentHashes.get(options.moduleId)!;
+      debug('Creating cached component', { moduleId: options.moduleId, hash })
+      cacheScope = hash;
     }
 
-    return originalFn({
-      ...factoryOrOptions,
-      factory: cacheFn(cacheScope, factoryOrOptions.factory, factoryOrOptions.moduleId),
-    });
+    return originalFn(
+      cacheFn(cacheScope, options.factory, options.moduleId),
+      options.moduleId,
+      options.propagation,
+    );
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
     return async (result: ExtendedSSRResult, props, slots) => {
-      if (result[ASSET_SERVICE_CALLS] === undefined) {
-        result[ASSET_SERVICE_CALLS] = [];
+      const context = getCurrentContext();
+
+      if (context) {
+        if (moduleId) {
+          context.nestedComponents[moduleId] = componentHashes.get(moduleId)!;
+        }
       }
 
-      if (slots !== undefined && Object.keys(slots).length > 0) return factory(result, props, slots);
+      if (slots !== undefined && Object.keys(slots).length > 0) {
+        debug('Skip caching of component instance with children', { moduleId });
+        return factory(result, props, slots);
+      }
 
       // TODO: Handle edge-cases involving Object.defineProperty
       const resolvedProps = Object.fromEntries((await Promise.all(
@@ -78,6 +88,7 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
       //
       // This is required because this block in Astro doesn't return the `transformResult.scope`:
       // https://github.com/withastro/astro/blob/799c8676dfba0d281faf2a3f2d9513518b57593b/packages/astro/src/vite-plugin-astro/index.ts?plain=1#L246-L257
+      // TODO: This might no longer be necessary, try removing it
       const scopeProp = Object.keys(resolvedProps).find(prop => prop.startsWith('data-astro-cid-'));
       if (scopeProp !== undefined) {
         delete resolvedProps[scopeProp];
@@ -88,12 +99,18 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
       const hash = hashSum([result.compressHTML, result.params, url.pathname, url.search, resolvedProps]);
       const cacheKey = `${cacheScope}:${hash}`;
 
-      const { runIn: enterAssetScope, collect: getAssetCallsRecord } = makeAssetCallRecordCollector();
+      const { runIn: enterTrackingScope, collect: collectTracking } = makeContextTracking();
 
-      return enterAssetScope(async () => {
+      return enterTrackingScope(async () => {
+        const cachedMetadata = await getValidMetadata(cacheKey);
+
+        const isEntrypoint = routeEntrypoints.includes(moduleId!);
+
         const cachedValue = await cache.getRenderValue(
           cacheKey,
           () => factory(result, props, slots),
+          isEntrypoint,
+          !cachedMetadata,
         );
 
         const resultValue = cachedValue.value()
@@ -106,49 +123,11 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
 
         const originalRender = templateResult.render;
 
-        if (cachedValue.cached) {
-          const cachedMetadata = await cache.getMetadata(cacheKey);
-          if (!cachedMetadata) return factory(result, props, slots);
+        if (cachedMetadata && cachedValue.cached) {
           const { metadata } = cachedMetadata;
-
-          const bailOut = Lazy.of(() => factory(result, props, slots));
 
           Object.assign(templateResult, {
             render: async (destination: RenderDestination) => {
-              // result.styles = cachedValue.styles;
-              // result.scripts = cachedValue.scripts;
-              // result.links = cachedValue.links;
-              // result.componentMetadata = cachedValue.componentMetadata;
-              // result.inlinedScripts = cachedValue.inlinedScripts;
-
-              if (moduleId?.endsWith('TestStyle.astro')) {
-                debugger;
-              }
-
-              for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
-                debug('Replaying getImage call', { options, config });
-                const result = await runtime.getImage(options, config);
-
-                if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
-                  debug('Image call mismatch, bailing out of cache');
-                  const bailed = await bailOut.get();
-                  if (bailed instanceof Response) {
-                    destination.write(bailed);
-                    return
-                  }
-
-                  if (runtime.isRenderTemplateResult(bailed)) {
-                    return bailed.render(destination);
-                  }
-
-                  if (runtime.isHeadAndContent(bailed)) {
-                    return bailed.content.render(destination);
-                  }
-
-                  throw new Error('Unexpected bail out result');
-                }
-              }
-
               const newMetadata: SSRMetadata = {
                 ...metadata,
                 extraHead: result._metadata.extraHead.concat(metadata.extraHead),
@@ -182,39 +161,63 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
         const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
 
         Object.assign(templateResult, {
-          render: (destination: RenderDestination) => enterAssetScope(async () => {
+          render: (destination: RenderDestination) => enterTrackingScope(async () => {
             // Renderer was not cached, so we need to cache the metadata as well
 
-            if (moduleId?.endsWith('TestStyle.astro')) {
-              debugger;
-            }
+            const context = collectTracking();
 
-            await cache.saveMetadata(cacheKey, {
-              // styles: result.styles,
-              // scripts: result.scripts,
-              // links: result.links,
-              // componentMetadata: result.componentMetadata,
-              // inlinedScripts: result.inlinedScripts,
-              assetServiceCalls: getAssetCallsRecord(),
+            await cache.saveMetadata({
+              key: cacheKey,
               metadata: {
-                ...result._metadata,
-                extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
-                renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
-                hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
-                rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
+                ...context,
+                metadata: {
+                  ...result._metadata,
+                  extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
+                  renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
+                  hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
+                  rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
+                },
               },
+              persist: !context.doNotCache && isEntrypoint,
             });
 
             return originalRender.call(templateResult, destination);
           }),
         });
 
-
         return resultValue;
       });
     }
   }
+
+  async function getValidMetadata(cacheKey: string): Promise<PersistedMetadata | null> {
+    const cachedMetadata = await cache.getMetadata(cacheKey);
+    if (!cachedMetadata) return null;
+
+    for (const [component, hash] of Object.entries(cachedMetadata.nestedComponents)) {
+      const currentHash = componentHashes.get(component);
+      if (currentHash !== hash) return null;
+    }
+
+    for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
+      debug('Replaying getImage call', { options, config });
+      const result = await runtime.getImage(options, config);
+
+      if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
+        debug('Image call mismatch, bailing out of cache');
+        return null;
+      }
+    }
+
+    for (const entry of cachedMetadata.renderEntryCalls) {
+      const currentHash = await computeEntryHash(entry.filePath);
+      if (currentHash !== entry.hash) return null;
+    }
+
+    return cachedMetadata;
+  }
 }
+
 
 function delayedSetDifference(previous: Set<string>): (next: Set<string>) => Set<string> {
   const storedPrevious = new Set(previous);
@@ -227,48 +230,3 @@ function delayedSetDifference(previous: Set<string>): (next: Set<string>) => Set
   }
 }
 
-const assetTrackingSym = Symbol.for('@domain-expansion:astro-asset-tracking');
-
-const assetCollector = new AsyncLocalStorage<PersistedMetadata['assetServiceCalls']>();
-
-(globalThis as any)[assetTrackingSym] = (getImage: GetImageFn): GetImageFn => {
-  runtime.getImage = getImage;
-  debug('Wrapping getImage');
-  return async (options, config) => {
-    debug('Get image called');
-    const result = await getImage(options, config);
-
-    const collector = assetCollector.getStore();
-
-    if (collector) {
-      const val: PersistedMetadata['assetServiceCalls'][number] = {
-        options, config,
-        resultingAttributes: result.attributes,
-      };
-      debug('Collected getImage call', val);
-      collector.push(val);
-    }
-
-    return result;
-  }
-}
-
-function makeAssetCallRecordCollector(): {
-  runIn: <T>(fn: () => T) => T,
-  collect: () => PersistedMetadata['assetServiceCalls'],
-} {
-  debug('Initializing asset collector');
-  const parent = assetCollector.getStore();
-  const collector: PersistedMetadata['assetServiceCalls'] = [];
-
-  return {
-    runIn: <T>(fn: () => T): T => {
-      return assetCollector.run(collector, fn);
-    },
-    collect: () => {
-      if (collector.length) debug('Retrieving collected images', { callCount: collector.length });
-      parent?.push(...collector);
-      return collector;
-    },
-  };
-}

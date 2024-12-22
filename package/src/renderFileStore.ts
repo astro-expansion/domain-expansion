@@ -6,11 +6,17 @@ import { mkdir } from "fs/promises";
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { Either, runtime, type Thunk } from "./utils.js";
 import { createHash } from 'node:crypto';
-import type { SSRMetadata, UnresolvedImageTransform } from "astro";
+import type { SSRMetadata } from "astro";
 import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
 import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
-import type { getImage } from "astro/assets";
+import * as zlib from "node:zlib";
+import { promisify } from "node:util";
+import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
+import type { ContextTracking } from "./contextTracking.ts";
 
+const
+  gzip = promisify(zlib.gzip),
+  gunzip = promisify(zlib.gunzip);
 
 const NON_SERIALIZABLE_RENDER_INSTRUCTIONS = [
   'renderer-hydration-script',
@@ -61,27 +67,11 @@ type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializ
   [T in K]: ValueSerializationMap[T] & { type: T }
 }[K];
 
-export type PersistedMetadata = {
-  // styles: Set<SSRElement>,
-  // scripts: Set<SSRElement>,
-  // links: Set<SSRElement>,
-  // componentMetadata: Map<string, SSRComponentMetadata>,
-  // inlinedScripts: Map<string, string>,
-  assetServiceCalls: Array<{
-    options: UnresolvedImageTransform,
-    config: Parameters<typeof getImage>[1],
-    resultingAttributes: Record<string, any>,
-  }>,
+export type PersistedMetadata = Omit<ContextTracking, 'doNotCache' | 'renderingEntry'> & {
   metadata: Omit<SSRMetadata, 'propagators'>,
 }
 
-export type SerializedMetadata = {
-  // styles: Array<SSRElement>,
-  // scripts: Array<SSRElement>,
-  // links: Array<SSRElement>,
-  // componentMetadata: Record<string, SSRComponentMetadata>,
-  // inlinedScripts: Record<string, string>,
-  assetServiceCalls: PersistedMetadata['assetServiceCalls'],
+export type SerializedMetadata = Omit<ContextTracking, 'doNotCache' | 'renderingEntry'> & {
   metadata: {
     hasHydrationScript: boolean;
     rendererSpecificHydrationScripts: Array<string>;
@@ -100,17 +90,18 @@ type ValueThunk = Thunk<AstroFactoryReturnValue>;
 export class RenderFileStore {
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
-  public constructor(cacheDir: string) {
-    this.resolver = createResolver(cacheDir).resolve;
+  public constructor(private readonly cacheDir: string) {
+    this.resolver = createResolver(this.cacheDir).resolve;
   }
 
   public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
+    debug('Persisting renderer for ', key);
     const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
       await writeFile(
         await this.resolvePath(key + ':renderer'),
-        JSON.stringify(denormalized, null, 2),
+        await gzip(Buffer.from(JSON.stringify(denormalized), 'utf-8'), { level: 9 }),
         'utf-8'
       );
     }
@@ -121,26 +112,27 @@ export class RenderFileStore {
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
       const serializedValue: SerializedValue = JSON.parse(
-        await readFile(await this.resolvePath(key + ':renderer'), 'utf-8'),
+        (await gunzip(
+          await readFile(await this.resolvePath(key + ':renderer')),
+        )).toString('utf-8')
       );
 
-      debug('Cache hit', key);
+      debug('Renderer cache hit', key);
+      fsCacheHit();
 
       return RenderFileStore.normalizeValue(serializedValue);
     } catch {
-      debug('Cache miss', key);
+      debug('Renderer cache miss', key);
+      fsCacheMiss();
       return null;
     }
   }
 
   public async saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+    debug('Persisting metadata for ', key);
+
     const serialized: SerializedMetadata = {
-      // styles: Array.from(metadata.styles),
-      // scripts: Array.from(metadata.scripts),
-      // links: Array.from(metadata.links),
-      // componentMetadata: Object.fromEntries(metadata.componentMetadata.entries()),
-      // inlinedScripts: Object.fromEntries(metadata.inlinedScripts.entries()),
-      assetServiceCalls: metadata.assetServiceCalls,
+      ...metadata,
       metadata: {
         ...metadata.metadata,
         hasDirectives: Array.from(metadata.metadata.hasDirectives),
@@ -149,28 +141,31 @@ export class RenderFileStore {
       },
     };
 
+    const serializedData = Buffer.from(JSON.stringify(serialized), 'utf-8');
+    trackStoredData(serializedData.byteLength);
+    const compressedData = await gzip(serializedData, { level: 9 });
+    trackStoredCompressedData(compressedData.byteLength);
+
     await writeFile(
       await this.resolvePath(key + ':metadata'),
-      JSON.stringify(serialized, null, 2),
-      'utf-8'
+      compressedData,
     );
   }
 
   public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
     try {
-      const serializedValue: SerializedMetadata = JSON.parse(
-        await readFile(await this.resolvePath(key + ':metadata'), 'utf-8'),
-      );
+      const storedData = await readFile(await this.resolvePath(key + ':metadata'));
+      trackLoadedCompressedData(storedData.byteLength);
+      const uncompressedData = await gunzip(storedData);
+      trackLoadedData(uncompressedData.byteLength);
 
-      debug('Cache hit', key);
+      const serializedValue: SerializedMetadata = JSON.parse(uncompressedData.toString('utf-8'));
+
+      debug('Metadata cache hit', key);
+      fsCacheHit();
 
       return {
-        // styles: new Set(serializedValue.styles),
-        // scripts: new Set(serializedValue.scripts),
-        // links: new Set(serializedValue.links),
-        // componentMetadata: new Map(Object.entries(serializedValue.componentMetadata)),
-        // inlinedScripts: new Map(Object.entries(serializedValue.inlinedScripts)),
-        assetServiceCalls: serializedValue.assetServiceCalls,
+        ...serializedValue,
         metadata: {
           ...serializedValue.metadata,
           hasDirectives: new Set(serializedValue.metadata.hasDirectives),
@@ -179,7 +174,8 @@ export class RenderFileStore {
         },
       };
     } catch {
-      debug('Cache miss', key);
+      debug('Metadata cache miss', key);
+      fsCacheMiss();
       return null;
     }
   }
@@ -195,7 +191,7 @@ export class RenderFileStore {
     return this.resolver(...pathSegments);
   }
 
-  private static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
+  public static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
     if (value instanceof Response) {
       const denormalized = await RenderFileStore.denormalizeResponse(value);
       return {
