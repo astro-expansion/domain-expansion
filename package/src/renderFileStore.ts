@@ -1,16 +1,23 @@
 import { createResolver } from "astro-integration-kit";
 import type { RenderDestination, RenderDestinationChunk } from "astro/runtime/server/render/common.js";
 import { rootDebug } from "./debug.js";
-import { readFile, writeFile } from "fs/promises";
-import { mkdir } from "fs/promises";
+import * as fs from 'node:fs';
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { Either, runtime, type Thunk } from "./utils.js";
-import { createHash } from 'node:crypto';
-import type { SSRMetadata, UnresolvedImageTransform } from "astro";
+import type { SSRMetadata } from "astro";
 import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
 import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
-import type { getImage } from "astro/assets";
+import * as zlib from "node:zlib";
+import { promisify } from "node:util";
+import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
+import type { ContextTracking } from "./contextTracking.js";
+import { MemoryCache } from "./inMemoryLRU.js";
+import { Lazy } from "@inox-tools/utils/lazy";
+import murmurHash from "murmurhash-native";
 
+const
+  gzip = promisify(zlib.gzip),
+  gunzip = promisify(zlib.gunzip);
 
 const NON_SERIALIZABLE_RENDER_INSTRUCTIONS = [
   'renderer-hydration-script',
@@ -61,27 +68,11 @@ type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializ
   [T in K]: ValueSerializationMap[T] & { type: T }
 }[K];
 
-export type PersistedMetadata = {
-  // styles: Set<SSRElement>,
-  // scripts: Set<SSRElement>,
-  // links: Set<SSRElement>,
-  // componentMetadata: Map<string, SSRComponentMetadata>,
-  // inlinedScripts: Map<string, string>,
-  assetServiceCalls: Array<{
-    options: UnresolvedImageTransform,
-    config: Parameters<typeof getImage>[1],
-    resultingAttributes: Record<string, any>,
-  }>,
+export type PersistedMetadata = Omit<ContextTracking, 'doNotCache' | 'renderingEntry'> & {
   metadata: Omit<SSRMetadata, 'propagators'>,
 }
 
-export type SerializedMetadata = {
-  // styles: Array<SSRElement>,
-  // scripts: Array<SSRElement>,
-  // links: Array<SSRElement>,
-  // componentMetadata: Record<string, SSRComponentMetadata>,
-  // inlinedScripts: Record<string, string>,
-  assetServiceCalls: PersistedMetadata['assetServiceCalls'],
+export type SerializedMetadata = Omit<ContextTracking, 'doNotCache' | 'renderingEntry'> & {
   metadata: {
     hasHydrationScript: boolean;
     rendererSpecificHydrationScripts: Array<string>;
@@ -98,21 +89,30 @@ const debug = rootDebug.extend('file-store');
 type ValueThunk = Thunk<AstroFactoryReturnValue>;
 
 export class RenderFileStore {
+  private readonly gzippedCache = new MemoryCache<Buffer>(Number.POSITIVE_INFINITY);
+
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
-  public constructor(cacheDir: string) {
-    this.resolver = createResolver(cacheDir).resolve;
+  private readonly knownFiles = Lazy.of(() => {
+    if (!fs.existsSync(this.cacheDir)) return Promise.resolve([]);
+
+    return fs.promises.readdir(this.cacheDir, {
+      recursive: true,
+      withFileTypes: false,
+    });
+  });
+
+  public constructor(private readonly cacheDir: string) {
+    this.resolver = createResolver(this.cacheDir).resolve;
+    fs.mkdirSync(this.cacheDir, { recursive: true });
   }
 
   public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
+    debug('Persisting renderer for ', key);
     const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
-      await writeFile(
-        await this.resolvePath(key + ':renderer'),
-        JSON.stringify(denormalized, null, 2),
-        'utf-8'
-      );
+      this.store(key + ':renderer', denormalized);
     }
 
     return clone;
@@ -120,27 +120,29 @@ export class RenderFileStore {
 
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const serializedValue: SerializedValue = JSON.parse(
-        await readFile(await this.resolvePath(key + ':renderer'), 'utf-8'),
-      );
+      const serializedValue: SerializedValue | null = await this.load(key + ':renderer');
 
-      debug('Cache hit', key);
+      if (!serializedValue) {
+        debug('Renderer cache miss', key);
+        return null;
+      }
+
+      debug('Renderer cache hit', key);
+      fsCacheHit();
 
       return RenderFileStore.normalizeValue(serializedValue);
     } catch {
-      debug('Cache miss', key);
+      debug('Renderer cache miss', key);
+      fsCacheMiss();
       return null;
     }
   }
 
-  public async saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+  public saveMetadata(key: string, metadata: PersistedMetadata): void {
+    debug('Persisting metadata for ', key);
+
     const serialized: SerializedMetadata = {
-      // styles: Array.from(metadata.styles),
-      // scripts: Array.from(metadata.scripts),
-      // links: Array.from(metadata.links),
-      // componentMetadata: Object.fromEntries(metadata.componentMetadata.entries()),
-      // inlinedScripts: Object.fromEntries(metadata.inlinedScripts.entries()),
-      assetServiceCalls: metadata.assetServiceCalls,
+      ...metadata,
       metadata: {
         ...metadata.metadata,
         hasDirectives: Array.from(metadata.metadata.hasDirectives),
@@ -149,28 +151,22 @@ export class RenderFileStore {
       },
     };
 
-    await writeFile(
-      await this.resolvePath(key + ':metadata'),
-      JSON.stringify(serialized, null, 2),
-      'utf-8'
-    );
+    this.store(key + ':metadata', serialized);
   }
 
   public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
     try {
-      const serializedValue: SerializedMetadata = JSON.parse(
-        await readFile(await this.resolvePath(key + ':metadata'), 'utf-8'),
-      );
+      const serializedValue: SerializedMetadata | null = await this.load(key + ':metadata');
+      if (!serializedValue) {
+        debug('Metadata cache miss', key);
+        return null;
+      }
 
-      debug('Cache hit', key);
+      debug('Metadata cache hit', key);
+      fsCacheHit();
 
       return {
-        // styles: new Set(serializedValue.styles),
-        // scripts: new Set(serializedValue.scripts),
-        // links: new Set(serializedValue.links),
-        // componentMetadata: new Map(Object.entries(serializedValue.componentMetadata)),
-        // inlinedScripts: new Map(Object.entries(serializedValue.inlinedScripts)),
-        assetServiceCalls: serializedValue.assetServiceCalls,
+        ...serializedValue,
         metadata: {
           ...serializedValue.metadata,
           hasDirectives: new Set(serializedValue.metadata.hasDirectives),
@@ -179,23 +175,48 @@ export class RenderFileStore {
         },
       };
     } catch {
-      debug('Cache miss', key);
+      debug('Metadata cache miss', key);
+      fsCacheMiss();
       return null;
     }
   }
 
-  private async resolvePath(key: string): Promise<string> {
-    const hash = createHash('sha3-224')
-      .update(key, 'utf8')
-      .digest('hex');
-    const pathSegments = [hash.substring(0, 6), hash.substring(6)];
-    const dir = this.resolver(...pathSegments.slice(0, -1));
-    await mkdir(dir, { recursive: true });
+  private store(cacheKey: string, data: any): void {
+    setTimeout(async () => {
+      try {
+        const serializedData = Buffer.from(JSON.stringify(data), 'utf-8');
+        trackStoredData(serializedData.byteLength);
+        const compressedData = await gzip(serializedData, { level: 9 });
+        trackStoredCompressedData(compressedData.byteLength);
 
-    return this.resolver(...pathSegments);
+        this.gzippedCache.storeSync(cacheKey, compressedData);
+        await fs.promises.writeFile(
+          this.resolver(murmurHash.murmurHash64(cacheKey)),
+          compressedData,
+        );
+      } catch (err) {
+        debug('Failed to persist data', err);
+      }
+    });
   }
 
-  private static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
+  private async load(cacheKey: string): Promise<any> {
+    const knownFiles = await this.knownFiles.get();
+    const hash = murmurHash.murmurHash64(cacheKey);
+    if (!knownFiles.includes(hash)) return null;
+
+    const storedData = await this.gzippedCache.load(
+      cacheKey,
+      async () => await fs.promises.readFile(this.resolver(hash)),
+    );
+    trackLoadedCompressedData(storedData.byteLength);
+    const uncompressedData = await gunzip(storedData);
+    trackLoadedData(uncompressedData.byteLength);
+
+    return JSON.parse(uncompressedData.toString('utf-8'));
+  }
+
+  public static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
     if (value instanceof Response) {
       const denormalized = await RenderFileStore.denormalizeResponse(value);
       return {

@@ -2,7 +2,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import catppuccin from "starlight-theme-catppuccin";
-// import domainExpansion from '@domain-expansion/astro';
+import domainExpansion from '@domain-expansion/astro';
 
 import node from '@astrojs/node';
 import starlightImageZoomPlugin from 'starlight-image-zoom';
@@ -11,7 +11,7 @@ import starlightImageZoomPlugin from 'starlight-image-zoom';
 export default defineConfig({
 	site: 'https://domainexpansion.gg',
 	integrations: [
-		// domainExpansion(),
+		domainExpansion(),
 		starlight({
 			title: 'Domain Expansion',
 			social: {
