@@ -11,7 +11,7 @@ import type { RenderDestination } from "astro/runtime/server/render/common.js";
 import type { PersistedMetadata } from "./renderFileStore.ts";
 import type { getImage } from "astro/assets";
 import { Lazy } from "@inox-tools/utils/lazy";
-import { isDeepStrictEqual } from "util";
+import { isDeepStrictEqual, types } from "util";
 import { AsyncLocalStorage } from "async_hooks";
 
 type GetImageFn = typeof getImage;
@@ -66,10 +66,10 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
 
       if (slots !== undefined && Object.keys(slots).length > 0) return factory(result, props, slots);
 
-      const resolvedProps = Object.fromEntries(await Promise.all(
+      const resolvedProps = Object.fromEntries((await Promise.all(
         Object.entries(props)
-          .map(async ([key, value]) => [key, await value])
-      ));
+          .map(async ([key, value]) => [key, types.isProxy(value) ? undefined : await value])
+      )).filter((_key, value) => !!value));
 
       // We need to delete this because otherwise scopes from outside of a component can be globally
       // restricted to the inside of a child component through a slot and to support that the component
