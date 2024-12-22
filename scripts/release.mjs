@@ -49,9 +49,9 @@ const main = async () => {
 	await run("git push");
 	await run("pnpm --filter @domain-expansion/astro build");
 	if (values.otp) {
-		await run(`pnpm changeset publish --otp=${values.otp}`);
+		await run(`pnpm changeset publish --pnpm --otp=${values.otp}`);
 	} else {
-		await run("pnpm changeset publish");
+		await run("pnpm changeset publish --pnpm");
 	}
 	await run("git push --follow-tags");
 	const tag = (await run("git describe --abbrev=0")).replace("\n", "");
