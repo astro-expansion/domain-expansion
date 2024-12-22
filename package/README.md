@@ -74,7 +74,7 @@ You can now edit files in `package`. Please note that making changes to those fi
 
 ## Licensing
 
-[MIT Licensed](https://github.com/astro-expansion/domain-expansion/blob/main/LICENSE). Made with ❤️ by [the Domain Expansion](https://github.com/TODO:).
+[MIT Licensed](https://github.com/astro-expansion/domain-expansion/blob/main/LICENSE). Made with ❤️ by [the Domain Expansion](https://domainexpansion.gg).
 
 ## Acknowledgements
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -41,16 +42,16 @@ const main = async () => {
 			otp: { type: "string" }
 		}
 	});
-	
+
 	await run("pnpm changeset version");
 	await run("git add .");
 	await run('git commit -m "chore: update version"');
 	await run("git push");
 	await run("pnpm --filter @domain-expansion/astro build");
 	if (values.otp) {
-		await run(`pnpm changeset publish --otp=${values.otp}`);
+		await run(`pnpm changeset publish --pnpm --otp=${values.otp}`);
 	} else {
-		await run("pnpm changeset publish");
+		await run("pnpm changeset publish --pnpm");
 	}
 	await run("git push --follow-tags");
 	const tag = (await run("git describe --abbrev=0")).replace("\n", "");
