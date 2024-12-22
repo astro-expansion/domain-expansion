@@ -6,9 +6,10 @@ import { mkdir } from "fs/promises";
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { Either, runtime, type Thunk } from "./utils.js";
 import { createHash } from 'node:crypto';
-import type { SSRComponentMetadata, SSRElement, SSRMetadata } from "astro";
+import type { SSRMetadata, UnresolvedImageTransform } from "astro";
 import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
 import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
+import type { getImage } from "astro/assets";
 
 
 const NON_SERIALIZABLE_RENDER_INSTRUCTIONS = [
@@ -61,20 +62,26 @@ type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializ
 }[K];
 
 export type PersistedMetadata = {
-  styles: Set<SSRElement>,
-  scripts: Set<SSRElement>,
-  links: Set<SSRElement>,
-  componentMetadata: Map<string, SSRComponentMetadata>,
-  inlinedScripts: Map<string, string>,
+  // styles: Set<SSRElement>,
+  // scripts: Set<SSRElement>,
+  // links: Set<SSRElement>,
+  // componentMetadata: Map<string, SSRComponentMetadata>,
+  // inlinedScripts: Map<string, string>,
+  assetServiceCalls: Array<{
+    options: UnresolvedImageTransform,
+    config: Parameters<typeof getImage>[1],
+    resultingAttributes: Record<string, any>,
+  }>,
   metadata: Omit<SSRMetadata, 'propagators'>,
 }
 
 export type SerializedMetadata = {
-  styles: Array<SSRElement>,
-  scripts: Array<SSRElement>,
-  links: Array<SSRElement>,
-  componentMetadata: Record<string, SSRComponentMetadata>,
-  inlinedScripts: Record<string, string>,
+  // styles: Array<SSRElement>,
+  // scripts: Array<SSRElement>,
+  // links: Array<SSRElement>,
+  // componentMetadata: Record<string, SSRComponentMetadata>,
+  // inlinedScripts: Record<string, string>,
+  assetServiceCalls: PersistedMetadata['assetServiceCalls'],
   metadata: {
     hasHydrationScript: boolean;
     rendererSpecificHydrationScripts: Array<string>;
@@ -127,21 +134,24 @@ export class RenderFileStore {
   }
 
   public async saveMetadata(key: string, metadata: PersistedMetadata): Promise<void> {
+    const serialized: SerializedMetadata = {
+      // styles: Array.from(metadata.styles),
+      // scripts: Array.from(metadata.scripts),
+      // links: Array.from(metadata.links),
+      // componentMetadata: Object.fromEntries(metadata.componentMetadata.entries()),
+      // inlinedScripts: Object.fromEntries(metadata.inlinedScripts.entries()),
+      assetServiceCalls: metadata.assetServiceCalls,
+      metadata: {
+        ...metadata.metadata,
+        hasDirectives: Array.from(metadata.metadata.hasDirectives),
+        renderedScripts: Array.from(metadata.metadata.renderedScripts),
+        rendererSpecificHydrationScripts: Array.from(metadata.metadata.rendererSpecificHydrationScripts),
+      },
+    };
+
     await writeFile(
       await this.resolvePath(key + ':metadata'),
-      JSON.stringify({
-        styles: Array.from(metadata.styles),
-        scripts: Array.from(metadata.scripts),
-        links: Array.from(metadata.links),
-        componentMetadata: Object.fromEntries(metadata.componentMetadata.entries()),
-        inlinedScripts: Object.fromEntries(metadata.inlinedScripts.entries()),
-        metadata: {
-          ...metadata.metadata,
-          hasDirectives: Array.from(metadata.metadata.hasDirectives),
-          renderedScripts: Array.from(metadata.metadata.renderedScripts),
-          rendererSpecificHydrationScripts: Array.from(metadata.metadata.rendererSpecificHydrationScripts),
-        },
-      }, null, 2),
+      JSON.stringify(serialized, null, 2),
       'utf-8'
     );
   }
@@ -155,11 +165,12 @@ export class RenderFileStore {
       debug('Cache hit', key);
 
       return {
-        styles: new Set(serializedValue.styles),
-        scripts: new Set(serializedValue.scripts),
-        links: new Set(serializedValue.links),
-        componentMetadata: new Map(Object.entries(serializedValue.componentMetadata)),
-        inlinedScripts: new Map(Object.entries(serializedValue.inlinedScripts)),
+        // styles: new Set(serializedValue.styles),
+        // scripts: new Set(serializedValue.scripts),
+        // links: new Set(serializedValue.links),
+        // componentMetadata: new Map(Object.entries(serializedValue.componentMetadata)),
+        // inlinedScripts: new Map(Object.entries(serializedValue.inlinedScripts)),
+        assetServiceCalls: serializedValue.assetServiceCalls,
         metadata: {
           ...serializedValue.metadata,
           hasDirectives: new Set(serializedValue.metadata.hasDirectives),

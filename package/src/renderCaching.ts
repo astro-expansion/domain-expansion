@@ -8,6 +8,13 @@ import type { SSRMetadata, SSRResult } from "astro";
 import { fileURLToPath } from "url";
 import { runtime } from "./utils.js";
 import type { RenderDestination } from "astro/runtime/server/render/common.js";
+import type { PersistedMetadata } from "./renderFileStore.ts";
+import type { getImage } from "astro/assets";
+import { Lazy } from "@inox-tools/utils/lazy";
+import { isDeepStrictEqual } from "util";
+import { AsyncLocalStorage } from "async_hooks";
+
+type GetImageFn = typeof getImage;
 
 type CacheRenderingFn = (originalFn: typeof Runtime.createComponent) => typeof Runtime.createComponent;
 
@@ -26,7 +33,11 @@ function getCallSites(): NodeJS.CallSite[] {
   }
 }
 
-// const interceptSym = Symbol();
+const ASSET_SERVICE_CALLS = Symbol('@domain-expansion:astro-assets-service-calls');
+
+interface ExtendedSSRResult extends SSRResult {
+  [ASSET_SERVICE_CALLS]: PersistedMetadata['assetServiceCalls'];
+}
 
 export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string[]): CacheRenderingFn => (originalFn) => {
   debug('Render caching called with:', { routeEntrypoints });
@@ -48,32 +59,10 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
-    return async (result: SSRResult, props, slots) => {
-      // if (!(result._metadata as any)[interceptSym]) {
-      //   Object.assign(result._metadata, { [interceptSym]: true });
-      //   const { propagators } = result._metadata;
-      //   const ref: any = {};
-      //   Object.defineProperty(result._metadata, 'propagators', {
-      //     get: () => {
-      //       debugger;
-      //       return ref.propagators;
-      //     },
-      //     set: (val) => {
-      //       if (ref.propagators) {
-      //         // Ref was already set
-      //         debugger;
-      //       }
-      //       ref.propagators = Object.assign(val, {
-      //         add: (...args: any[]) => {
-      //           debugger;
-      //           return Set.prototype.add.apply(val, args as any);
-      //         },
-      //       });
-      //     }
-      //   });
-      //
-      //   result._metadata.propagators = propagators;
-      // }
+    return async (result: ExtendedSSRResult, props, slots) => {
+      if (result[ASSET_SERVICE_CALLS] === undefined) {
+        result[ASSET_SERVICE_CALLS] = [];
+      }
 
       if (slots !== undefined && Object.keys(slots).length > 0) return factory(result, props, slots);
 
@@ -98,99 +87,130 @@ export const makeCaching = (cache: Cache, root: string, routeEntrypoints: string
       const hash = hashSum([result.compressHTML, result.params, url.pathname, url.search, resolvedProps]);
       const cacheKey = `${cacheScope}:${hash}`;
 
-      const cachedValue = await cache.getRenderValue(
-        cacheKey,
-        () => factory(result, props, slots),
-      );
+      const { runIn: enterAssetScope, collect: getAssetCallsRecord } = makeAssetCallRecordCollector();
 
-      const resultValue = cachedValue.value()
+      return enterAssetScope(async () => {
+        const cachedValue = await cache.getRenderValue(
+          cacheKey,
+          () => factory(result, props, slots),
+        );
 
-      if (resultValue instanceof Response) return resultValue;
+        const resultValue = cachedValue.value()
 
-      const templateResult = runtime.isRenderTemplateResult(resultValue)
-        ? resultValue
-        : resultValue.content;
+        if (resultValue instanceof Response) return resultValue;
 
-      const originalRender = templateResult.render;
+        const templateResult = runtime.isRenderTemplateResult(resultValue)
+          ? resultValue
+          : resultValue.content;
 
-      if (cachedValue.cached) {
-        const cachedMetadata = await cache.getMetadata(cacheKey);
-        if (!cachedMetadata) return factory(result, props, slots);
-        const { metadata } = cachedMetadata;
+        const originalRender = templateResult.render;
+
+        if (cachedValue.cached) {
+          const cachedMetadata = await cache.getMetadata(cacheKey);
+          if (!cachedMetadata) return factory(result, props, slots);
+          const { metadata } = cachedMetadata;
+
+          const bailOut = Lazy.of(() => factory(result, props, slots));
+
+          Object.assign(templateResult, {
+            render: async (destination: RenderDestination) => {
+              // result.styles = cachedValue.styles;
+              // result.scripts = cachedValue.scripts;
+              // result.links = cachedValue.links;
+              // result.componentMetadata = cachedValue.componentMetadata;
+              // result.inlinedScripts = cachedValue.inlinedScripts;
+
+              if (moduleId?.endsWith('TestStyle.astro')) {
+                debugger;
+              }
+
+              for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
+                debug('Replaying getImage call', { options, config });
+                const result = await runtime.getImage(options, config);
+
+                if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
+                  debug('Image call mismatch, bailing out of cache');
+                  const bailed = await bailOut.get();
+                  if (bailed instanceof Response) {
+                    destination.write(bailed);
+                    return
+                  }
+
+                  if (runtime.isRenderTemplateResult(bailed)) {
+                    return bailed.render(destination);
+                  }
+
+                  if (runtime.isHeadAndContent(bailed)) {
+                    return bailed.content.render(destination);
+                  }
+
+                  throw new Error('Unexpected bail out result');
+                }
+              }
+
+              const newMetadata: SSRMetadata = {
+                ...metadata,
+                extraHead: result._metadata.extraHead.concat(metadata.extraHead),
+                renderedScripts: new Set([
+                  ...result._metadata.renderedScripts.values(),
+                  ...metadata.renderedScripts.values(),
+                ]),
+                hasDirectives: new Set([
+                  ...result._metadata.hasDirectives.values(),
+                  ...metadata.hasDirectives.values(),
+                ]),
+                rendererSpecificHydrationScripts: new Set([
+                  ...result._metadata.rendererSpecificHydrationScripts.values(),
+                  ...metadata.rendererSpecificHydrationScripts.values(),
+                ]),
+                propagators: result._metadata.propagators,
+              };
+
+              Object.assign(result._metadata, newMetadata);
+
+              return originalRender.call(templateResult, destination);
+            }
+          })
+
+          return resultValue;
+        }
+
+        const previousExtraHeadLength = result._metadata.extraHead.length;
+        const renderedScriptsDiff = delayedSetDifference(result._metadata.renderedScripts);
+        const hasDirectivedDiff = delayedSetDifference(result._metadata.hasDirectives);
+        const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
 
         Object.assign(templateResult, {
-          render: (destination: RenderDestination) => {
-            // result.styles = cachedValue.styles;
-            // result.scripts = cachedValue.scripts;
-            // result.links = cachedValue.links;
-            // result.componentMetadata = cachedValue.componentMetadata;
-            // result.inlinedScripts = cachedValue.inlinedScripts;
+          render: (destination: RenderDestination) => enterAssetScope(async () => {
+            // Renderer was not cached, so we need to cache the metadata as well
 
             if (moduleId?.endsWith('TestStyle.astro')) {
               debugger;
             }
 
-            const newMetadata: SSRMetadata = {
-              ...metadata,
-              extraHead: result._metadata.extraHead.concat(metadata.extraHead),
-              renderedScripts: new Set([
-                ...result._metadata.renderedScripts.values(),
-                ...metadata.renderedScripts.values(),
-              ]),
-              hasDirectives: new Set([
-                ...result._metadata.hasDirectives.values(),
-                ...metadata.hasDirectives.values(),
-              ]),
-              rendererSpecificHydrationScripts: new Set([
-                ...result._metadata.rendererSpecificHydrationScripts.values(),
-                ...metadata.rendererSpecificHydrationScripts.values(),
-              ]),
-              propagators: result._metadata.propagators,
-            };
-
-            Object.assign(result._metadata, newMetadata);
+            await cache.saveMetadata(cacheKey, {
+              // styles: result.styles,
+              // scripts: result.scripts,
+              // links: result.links,
+              // componentMetadata: result.componentMetadata,
+              // inlinedScripts: result.inlinedScripts,
+              assetServiceCalls: getAssetCallsRecord(),
+              metadata: {
+                ...result._metadata,
+                extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
+                renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
+                hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
+                rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
+              },
+            });
 
             return originalRender.call(templateResult, destination);
-          }
-        })
+          }),
+        });
+
 
         return resultValue;
-      }
-
-      const previousExtraHeadLength = result._metadata.extraHead.length;
-      const renderedScriptsDiff = delayedSetDifference(result._metadata.renderedScripts);
-      const hasDirectivedDiff = delayedSetDifference(result._metadata.hasDirectives);
-      const rendererSpecificHydrationScriptsDiff = delayedSetDifference(result._metadata.rendererSpecificHydrationScripts);
-
-      Object.assign(templateResult, {
-        render: async (destination: RenderDestination) => {
-          // Renderer was not cached, so we need to cache the metadata as well
-
-          if (moduleId?.endsWith('TestStyle.astro')) {
-            debugger;
-          }
-
-          await cache.saveMetadata(cacheKey, {
-            styles: result.styles,
-            scripts: result.scripts,
-            links: result.links,
-            componentMetadata: result.componentMetadata,
-            inlinedScripts: result.inlinedScripts,
-            metadata: {
-              ...result._metadata,
-              extraHead: result._metadata.extraHead.slice(previousExtraHeadLength),
-              renderedScripts: renderedScriptsDiff(result._metadata.renderedScripts),
-              hasDirectives: hasDirectivedDiff(result._metadata.hasDirectives),
-              rendererSpecificHydrationScripts: rendererSpecificHydrationScriptsDiff(result._metadata.rendererSpecificHydrationScripts),
-            },
-          });
-
-          return originalRender.call(templateResult, destination);
-        },
       });
-
-
-      return resultValue;
     }
   }
 }
@@ -204,4 +224,50 @@ function delayedSetDifference(previous: Set<string>): (next: Set<string>) => Set
     }
     return newSet;
   }
+}
+
+const assetTrackingSym = Symbol.for('@domain-expansion:astro-asset-tracking');
+
+const assetCollector = new AsyncLocalStorage<PersistedMetadata['assetServiceCalls']>();
+
+(globalThis as any)[assetTrackingSym] = (getImage: GetImageFn): GetImageFn => {
+  runtime.getImage = getImage;
+  debug('Wrapping getImage');
+  return async (options, config) => {
+    debug('Get image called');
+    const result = await getImage(options, config);
+
+    const collector = assetCollector.getStore();
+
+    if (collector) {
+      const val: PersistedMetadata['assetServiceCalls'][number] = {
+        options, config,
+        resultingAttributes: result.attributes,
+      };
+      debug('Collected getImage call', val);
+      collector.push(val);
+    }
+
+    return result;
+  }
+}
+
+function makeAssetCallRecordCollector(): {
+  runIn: <T>(fn: () => T) => T,
+  collect: () => PersistedMetadata['assetServiceCalls'],
+} {
+  debug('Initializing asset collector');
+  const parent = assetCollector.getStore();
+  const collector: PersistedMetadata['assetServiceCalls'] = [];
+
+  return {
+    runIn: <T>(fn: () => T): T => {
+      return assetCollector.run(collector, fn);
+    },
+    collect: () => {
+      if (collector.length) debug('Retrieving collected images', { callCount: collector.length });
+      parent?.push(...collector);
+      return collector;
+    },
+  };
 }

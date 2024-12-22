@@ -37,6 +37,7 @@
 		"astro": "^5.0.0"
 	},
 	"dependencies": {
+		"@inox-tools/utils": "^0.3.0",
 		"astro-integration-kit": "^0.17.0",
 		"debug": "^4.4.0",
 		"estree-walker": "^3.0.3",
