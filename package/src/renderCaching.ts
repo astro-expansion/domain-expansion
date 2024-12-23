@@ -30,7 +30,7 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
 }): CacheRenderingFn => (originalFn) => {
   debug('Render caching called with:', { routeEntrypoints });
 
-  return (factoryOrOptions, moduleId, propagation) => {
+  return function cachedCreateComponent(factoryOrOptions, moduleId, propagation) {
     const options = typeof factoryOrOptions === 'function'
       ? { factory: factoryOrOptions, moduleId, propagation } as Exclude<typeof factoryOrOptions, Function>
       : factoryOrOptions;
@@ -212,9 +212,9 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
         if (currentHash !== hash) return null;
       }
 
-      for (const { options, config, resultingAttributes } of cachedMetadata.assetServiceCalls) {
-        debug('Replaying getImage call', { options, config });
-        const result = await runtime.getImage(options, config);
+      for (const { options, resultingAttributes } of cachedMetadata.assetServiceCalls) {
+        debug('Replaying getImage call', { options });
+        const result = await runtime.getImage(options);
 
         if (!isDeepStrictEqual(result.attributes, resultingAttributes)) {
           debug('Image call mismatch, bailing out of cache');

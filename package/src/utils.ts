@@ -3,7 +3,7 @@ import type { SlotString } from "astro/runtime/server/render/slot.js";
 import type { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
 import type { isRenderTemplateResult, renderTemplate, } from "astro/runtime/server/render/astro/render-template.js";
 import type { createRenderInstruction } from "astro/runtime/server/render/instruction.js";
-import type { getImage } from "astro/assets";
+import type { getImage } from "astro:assets";
 import type { renderEntry } from 'astro/content/runtime';
 
 type RuntimeInstances = {

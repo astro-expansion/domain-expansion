@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- 4309f3e: Memory and performance improvements
+
 ## 0.1.0-beta.4
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { PersistedMetadata } from "./renderFileStore.js";
 import { runtime } from "./utils.js";
-import type { getImage } from "astro/assets";
+import type { getImage } from "astro:assets";
 import { rootDebug } from "./debug.js";
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
@@ -12,7 +12,6 @@ import { getSystemErrorName, types } from "node:util";
 export type ContextTracking = {
   assetServiceCalls: Array<{
     options: UnresolvedImageTransform,
-    config: Parameters<typeof getImage>[1],
     resultingAttributes: Record<string, any>,
   }>,
   renderEntryCalls: Array<{
@@ -72,13 +71,13 @@ const assetTrackingSym = Symbol.for('@domain-expansion:astro-asset-tracking');
 (globalThis as any)[assetTrackingSym] = (original: typeof getImage): typeof getImage => {
   runtime.getImage = original;
   debug('Wrapping getImage');
-  return async (options, config) => {
-    const result = await original(options, config);
+  return async (options) => {
+    const result = await original(options);
 
     const context = contextTracking.getStore();
     if (context) {
       const val: PersistedMetadata['assetServiceCalls'][number] = {
-        options, config,
+        options,
         resultingAttributes: result.attributes,
       };
       debug('Collected getImage call', val);
