@@ -96,10 +96,10 @@ if ! is_excluded "starlight"; then
   } & 
 fi
 
-if ! is_excluded "cloudflare-docs"; then 
+if ! is_excluded "astro.build"; then 
   {
-    git clone --depth 1 https://github.com/cloudflare/cloudflare-docs &> /dev/null
-    echo -e "    Cloned ${C_STEELBLUE1}cloudflare/cloudflare-docs${NO_FORMAT}!"
+    git clone --depth 1 https://github.com/withastro/astro.build &> /dev/null
+    echo -e "    Cloned ${C_STEELBLUE1}withastro/astro.build${NO_FORMAT}!"
   } & 
 fi
 
@@ -228,34 +228,35 @@ if ! is_excluded "starlight"; then
 fi
 
 ###############################
-# cloudflare/cloudflare-docs
+# withastro/astro.build
 ###############################
 
-if ! is_excluded "cloudflare-docs"; then
-  cd "$temp_dir/cloudflare-docs"
+if ! is_excluded "astro.build"; then
+  cd "$temp_dir/astro.build"
 
-  echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}cloudflare/cloudflare-docs${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
+  echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}withastro/astro.build${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}npm install${NO_FORMAT}..."
-  npm install &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}npm run build${NO_FORMAT} (to warm up)..."
-  npm run build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm astro build${NO_FORMAT} (to warm up)..."
+  pnpm astro build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
-    --export-markdown "$ROOT/.results/cloudflare-docs.md" \
-    --runs 3 \
+    --export-markdown "$ROOT/.results/astro.build.md" \
+    --runs 1 \
+    --show-output \
     --prepare '' \
-    -n '[Cloudflare Docs] Normal Build' \
-    'npm run build' \
-    --prepare 'npx astro add @domain-expansion/astro -y && rm -rf ./node_modules/.domain-expansion' \
-    -n '[Cloudflare Docs] Domain Expansion (cold build)' \
-    'npm run build' \
+    -n '[astro.build] Normal Build' \
+    'pnpm astro build' \
+    --prepare 'npx astro add @domain-expansion/astro && rm -rf ./node_modules/.domain-expansion' \
+    -n '[astro.build] Domain Expansion (cold build)' \
+    'pnpm astro build' \
     --prepare '' \
-    -n '[Cloudflare Docs] Domain Expansion (hot build)' \
-    'npm run build'
+    -n '[astro.build] Domain Expansion (hot build)' \
+    'pnpm astro build'
 fi
 
 ###############################

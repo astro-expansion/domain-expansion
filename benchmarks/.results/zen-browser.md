@@ -1,5 +1,5 @@
 | Command | Mean [s] | Min [s] | Max [s] | Relative |
 |:---|---:|---:|---:|---:|
-| `[Zen Browser Website] Normal Build` | 15.391 ± 1.337 | 14.011 | 18.327 | 1.00 |
-| `[Zen Browser Website] Domain Expansion (cold build)` | 17.459 ± 0.305 | 16.951 | 17.894 | 1.13 ± 0.10 |
-| `[Zen Browser Website] Domain Expansion (hot build)` | 18.230 ± 1.156 | 17.077 | 20.382 | 1.18 ± 0.13 |
+| `[Zen Browser Website] Normal Build` | 14.983 ± 0.631 | 14.132 | 15.977 | 1.00 |
+| `[Zen Browser Website] Domain Expansion (cold build)` | 17.880 ± 0.603 | 16.973 | 18.934 | 1.19 ± 0.06 |
+| `[Zen Browser Website] Domain Expansion (hot build)` | 17.490 ± 0.469 | 16.870 | 18.533 | 1.17 ± 0.06 |

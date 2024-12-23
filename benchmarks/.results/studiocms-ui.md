@@ -1,5 +1,5 @@
 | Command | Mean [s] | Min [s] | Max [s] | Relative |
 |:---|---:|---:|---:|---:|
-| `[StudioCMS UI Docs] Normal Build` | 10.933 ± 1.697 | 9.797 | 14.621 | 1.10 ± 0.17 |
-| `[StudioCMS UI Docs] Domain Expansion (cold build)` | 10.803 ± 0.334 | 10.358 | 11.321 | 1.09 ± 0.05 |
-| `[StudioCMS UI Docs] Domain Expansion (hot build)` | 9.949 ± 0.348 | 9.618 | 10.785 | 1.00 |
+| `[StudioCMS UI Docs] Normal Build` | 10.498 ± 0.404 | 9.889 | 10.962 | 1.07 ± 0.06 |
+| `[StudioCMS UI Docs] Domain Expansion (cold build)` | 11.004 ± 0.534 | 10.250 | 11.929 | 1.12 ± 0.08 |
+| `[StudioCMS UI Docs] Domain Expansion (hot build)` | 9.849 ± 0.463 | 9.373 | 10.653 | 1.00 |

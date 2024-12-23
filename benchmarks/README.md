@@ -24,12 +24,12 @@ You can run the script with the `--exclude=...` flag to exclude certain benchmar
 
 - `astro-docs`
 - `starlight`
-- `cloudflare-docs`
+- `astro.build`
 - `studiocms-ui`
 - `brutal`
 - `zen-browser`
 
-For example, using `./bench.sh --exlude=astro-docs,cloudflare-docs` would exclude the two longest benchmarks!
+For example, using `./bench.sh --exlude=astro-docs,astro.build` would exclude the two longest benchmarks!
 
 ## What we benchmark
 
@@ -39,7 +39,7 @@ We chose 6 open-source Astro projects of varying sizes:
 2. [docs.astro.build](https://docs.astro.build), the Astro docs and probably the biggest Astro-powered repository out there due to its translations
 3. [starlight.astro.build](https://starlight.astro.build), the documentation for Starlight to represent mid-scale documentation projects
 4. [ui.studiocms.dev](https://ui.studiocms.dev), a small documentation with a lot of MDX components
-5. [developers.cloudflare.com](https://developers.cloudflare.com), probably the biggest single-language Astro-powererd site
+5. [zen-browser.app](https://zen-browser.app), a small landing page
 6. [brutal.elian.codes](https://brutal.elian.codes), a popular Astro theme and rather small project compared to the rest
 
 ## How we benchmark
