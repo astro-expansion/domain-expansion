@@ -22,6 +22,10 @@ export class Cache {
     this.persisted = new RenderFileStore(cacheDir);
   }
 
+  public initialize(): Promise<void> {
+    return this.persisted.initialize();
+  }
+
   public saveRenderValue({ key, factoryValue, ...options }: {
     key: string,
     factoryValue: AstroFactoryReturnValue,

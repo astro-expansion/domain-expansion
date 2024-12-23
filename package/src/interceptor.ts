@@ -8,6 +8,7 @@ import { Cache } from './cache.js';
 import { createResolver } from 'astro-integration-kit';
 import MagicString, { type SourceMap } from 'magic-string';
 import hash_sum from 'hash-sum';
+import assert from 'node:assert';
 
 const debug = rootDebug.extend('interceptor-plugin');
 
@@ -19,6 +20,8 @@ const EXCLUDED_MODULE_IDS: string[] = [
   '\0astro:assets',
 ];
 
+type ParseNode = ETreeNode & AstNode;
+
 export const interceptorPlugin = (options: {
   cacheComponents: false | 'in-memory' | 'persistent',
   cachePages: boolean,
@@ -29,12 +32,16 @@ export const interceptorPlugin = (options: {
   return {
     name: '@domain-expansion/interceptor',
     enforce: 'post',
-    configResolved(config) {
+    async configResolved(config) {
       const { resolve: resolver } = createResolver(config.root);
+
+      const cache = new Cache(resolver('node_modules/.domain-expansion'));
+
+      await cache.initialize();
 
       (globalThis as any)[Symbol.for('@domain-expansion:astro-component-caching')] = makeCaching({
         ...options,
-        cache: new Cache(resolver('node_modules/.domain-expansion')),
+        cache,
         root: config.root,
         routeEntrypoints: options.routeEntrypoints.map(entrypoint => resolver(entrypoint)),
         componentHashes,
@@ -147,7 +154,7 @@ const createComponentTransformer: Transformer = (ctx, code, id) => {
 
   walk(ast, {
     leave(estreeNode, parent) {
-      const node = estreeNode as ETreeNode & AstNode;
+      const node = estreeNode as ParseNode;
       if (node.type !== 'FunctionDeclaration') return;
       if (node.id.name !== 'createComponent') return;
       if (parent?.type !== 'Program') {
@@ -169,30 +176,39 @@ const createComponentTransformer: Transformer = (ctx, code, id) => {
 }
 
 const getImageAssetTransformer: Transformer = (ctx, code, id) => {
-  if (!code.includes('function getImage(')) return null;
-
-  if (!/node_modules\/astro\/dist\/assets\/[\w\/.-]+\.js/.test(id)) {
-    debug('"getImage" declaration outside of expected module', { id });
-    return null;
-  }
+  if (id !== '\0astro:assets') return null;
 
   const ms = new MagicString(code);
   const ast = ctx.parse(code);
 
-  walk(ast, {
-    enter(estreeNode, parent) {
-      const node = estreeNode as ETreeNode & AstNode;
-      if (node.type !== 'FunctionDeclaration') return;
-      if (node.id.name !== 'getImage') return;
-      if (parent?.type !== 'Program') {
-        throw new Error('Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.');
-      }
+  const path: ParseNode[] = [];
 
-      ms.prependLeft(node.start, [
+  walk(ast, {
+    enter(estreeNode) {
+      const node = estreeNode as ParseNode;
+      path.push(node);
+      if (
+        node.type !== 'VariableDeclarator'
+        || node.id.type !== 'Identifier'
+        || node.id.name !== 'getImage'
+      ) return;
+      const exportDeclaration = path.at(-3);
+      assert.ok(isParseNode(node.init));
+      assert.ok(
+        exportDeclaration?.type === 'ExportNamedDeclaration',
+        'Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.',
+      );
+
+      ms.prependLeft(
+        exportDeclaration.start,
         `import {domainExpansionAssets as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};\n`,
-        'const getImage = $$domainExpansion(',
-      ].join('\n'));
-      ms.appendRight(node.end, ');');
+      );
+      ms.prependLeft(node.init.start, '$$domainExpansion(');
+      ms.appendRight(node.init.end, ')');
+    },
+    leave(estreeNode) {
+      const lastNode = path.pop();
+      assert.ok(Object.is(lastNode, estreeNode), 'Stack tracking broke');
     },
   });
 
@@ -215,7 +231,7 @@ const renderCCEntryTransformer: Transformer = (ctx, code, id) => {
 
   walk(ast, {
     enter(estreeNode, parent) {
-      const node = estreeNode as ETreeNode & AstNode;
+      const node = estreeNode as ParseNode;
       if (node.type !== 'FunctionDeclaration') return;
       if (node.id.name !== 'renderEntry') return;
       if (parent?.type !== 'Program') {
@@ -234,4 +250,8 @@ const renderCCEntryTransformer: Transformer = (ctx, code, id) => {
     code: ms.toString(),
     map: ms.generateMap(),
   };
+}
+
+function isParseNode(node?: ETreeNode | null): node is ParseNode {
+  return node != null && 'start' in node && typeof node.start === 'number';
 }

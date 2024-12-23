@@ -12,7 +12,6 @@ import { promisify } from "node:util";
 import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
 import type { ContextTracking } from "./contextTracking.js";
 import { MemoryCache } from "./inMemoryLRU.js";
-import { Lazy } from "@inox-tools/utils/lazy";
 import murmurHash from "murmurhash-native";
 
 const
@@ -93,18 +92,29 @@ export class RenderFileStore {
 
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
 
-  private readonly knownFiles = Lazy.of(() => {
-    if (!fs.existsSync(this.cacheDir)) return Promise.resolve([]);
-
-    return fs.promises.readdir(this.cacheDir, {
-      recursive: true,
-      withFileTypes: false,
-    });
-  });
+  private knownFiles!: string[];
 
   public constructor(private readonly cacheDir: string) {
     this.resolver = createResolver(this.cacheDir).resolve;
     fs.mkdirSync(this.cacheDir, { recursive: true });
+  }
+
+  public async initialize() {
+    if (fs.existsSync(this.cacheDir)) {
+      this.knownFiles = await fs.promises.readdir(this.cacheDir, {
+        recursive: true,
+        withFileTypes: false,
+      });
+    } else {
+      this.knownFiles = [];
+    }
+
+    await Promise.all(this.knownFiles.map(async hash => {
+      try {
+        const stored = await fs.promises.readFile(this.resolver(hash));
+        this.gzippedCache.storeSync(hash, stored);
+      } catch { }
+    }))
   }
 
   public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
@@ -181,17 +191,18 @@ export class RenderFileStore {
     }
   }
 
-  private store(cacheKey: string, data: any): void {
+  public store(cacheKey: string, data: any): void {
     setTimeout(async () => {
       try {
-        const serializedData = Buffer.from(JSON.stringify(data), 'utf-8');
+        const serializedData = Buffer.isBuffer(data) ? data : Buffer.from(JSON.stringify(data), 'utf-8');
         trackStoredData(serializedData.byteLength);
         const compressedData = await gzip(serializedData, { level: 9 });
         trackStoredCompressedData(compressedData.byteLength);
 
-        this.gzippedCache.storeSync(cacheKey, compressedData);
+        const hash = murmurHash.murmurHash64(cacheKey);
+        this.gzippedCache.storeSync(hash, compressedData);
         await fs.promises.writeFile(
-          this.resolver(murmurHash.murmurHash64(cacheKey)),
+          this.resolver(hash),
           compressedData,
         );
       } catch (err) {
@@ -200,20 +211,19 @@ export class RenderFileStore {
     });
   }
 
-  private async load(cacheKey: string): Promise<any> {
-    const knownFiles = await this.knownFiles.get();
+  public async load(cacheKey: string, parse = true): Promise<any> {
     const hash = murmurHash.murmurHash64(cacheKey);
-    if (!knownFiles.includes(hash)) return null;
+    if (!this.knownFiles.includes(hash)) return null;
 
     const storedData = await this.gzippedCache.load(
-      cacheKey,
+      hash,
       async () => await fs.promises.readFile(this.resolver(hash)),
     );
     trackLoadedCompressedData(storedData.byteLength);
     const uncompressedData = await gunzip(storedData);
     trackLoadedData(uncompressedData.byteLength);
 
-    return JSON.parse(uncompressedData.toString('utf-8'));
+    return parse ? JSON.parse(uncompressedData.toString('utf-8')) : uncompressedData;
   }
 
   public static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {

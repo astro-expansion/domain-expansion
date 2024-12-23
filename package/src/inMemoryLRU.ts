@@ -29,6 +29,17 @@ export class MemoryCache<T> {
     return fresh;
   }
 
+  public async getAll(): Promise<Record<string, T>> {
+    return Object.fromEntries(await Promise.all(
+      Array.from(this.#cache.entries())
+        .map(([k, v]) => (
+          Either.isLeft(v)
+            ? [k, v.value]
+            : v.value.then(value => [k, value])
+        ))
+    ));
+  }
+
   public get(key: string): MaybePromise<T> | null {
     const cached = this.#cache.get(key);
 
