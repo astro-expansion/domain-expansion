@@ -118,7 +118,7 @@ if ! is_excluded "zen-browser"; then
   yes | pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT} (to warm up)..."
   pnpm build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
@@ -148,7 +148,7 @@ if ! is_excluded "studiocms-ui"; then
   yes | pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT} (to warm up)..."
   pnpm build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
@@ -178,12 +178,13 @@ if ! is_excluded "brutal"; then
   yes | pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT} (to warm up)..."
   pnpm build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
     --show-output \
+    --runs 1 \
     --export-markdown "$ROOT/.results/brutal.md" \
     -n '[Brutal Theme] Normal Build' \
     --prepare '' \
@@ -209,12 +210,11 @@ if ! is_excluded "starlight"; then
   yes | pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT} (to warm up)..."
   pnpm build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
-    --show-output \
     --export-markdown "$ROOT/.results/starlight.md" \
     --prepare '' \
     -n '[Starlight Docs] Normal Build' \
@@ -240,7 +240,7 @@ if ! is_excluded "cloudflare-docs"; then
   npm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}npm run build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}npm run build${NO_FORMAT} (to warm up)..."
   npm run build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
@@ -273,7 +273,7 @@ if ! is_excluded "astro-docs"; then
   yes | pnpm install &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT} (to warm up)..."
   pnpm build &> /dev/null
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 

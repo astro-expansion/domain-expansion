@@ -14,7 +14,7 @@ RAM: 32GB DDR4 3200MHz
 
 ## Getting Started
 
-First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file). You can find instructions in their README file. To run this benchmark, you also need to have `git` and Python `3.11` or earlier installed.
+First, install [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-ov-file). You can find instructions in their README file. To run this benchmark, you also need to have `git` and Python installed.
 
 Once installed, run the `bench.sh` script in this directory.
 
