@@ -13,6 +13,8 @@ import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, tr
 import type { ContextTracking } from "./contextTracking.js";
 import { MemoryCache } from "./inMemoryLRU.js";
 import murmurHash from "murmurhash-native";
+import avsc from "avsc";
+import { commonTypes, literalType, logicalTypes } from "./avsc.js";
 
 const
   gzip = promisify(zlib.gzip),
@@ -29,7 +31,7 @@ type SerializableRenderInstruction = Exclude<RenderInstruction, {
 type ChunkSerializationMap = {
   primitive: { value: string | number | boolean },
   htmlString: { value: string },
-  htmlBytes: { value: string },
+  htmlBytes: { value: Buffer },
   slotString: {
     value: string,
     renderInstructions: Array<SerializableRenderInstruction> | undefined,
@@ -38,7 +40,7 @@ type ChunkSerializationMap = {
     instruction: SerializableRenderInstruction,
   },
   arrayBufferView: {
-    value: string,
+    value: Buffer,
   }
   response: {
     body: string,
@@ -63,6 +65,247 @@ type ValueSerializationMap = {
   response: ChunkSerializationMap['response'],
 }
 
+const serializedChunksAvro: avsc.schema.RecordType[] = [
+  {
+    type: 'record',
+    name: 'SerializedPrimitive',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('primitive'),
+      },
+      {
+        name: 'value',
+        type: ['string', 'float', 'boolean'],
+      },
+    ]
+  },
+  {
+    type: 'record',
+    name: 'SerializedHTMLString',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('htmlString'),
+      },
+      {
+        name: 'value',
+        type: 'string',
+      },
+    ]
+  },
+  {
+    type: 'record',
+    name: 'SerializedHTMLBytes',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('htmlBytes'),
+      },
+      {
+        name: 'value',
+        type: 'bytes',
+      },
+    ]
+  },
+  {
+    type: 'record',
+    name: 'SerializedRenderInstructionChunk',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('renderInstruction'),
+      },
+      {
+        name: 'instruction',
+        type: [
+          {
+            type: 'record',
+            name: 'RenderDirectiveInstruction',
+            fields: [
+              {
+                name: 'type',
+                type: literalType('directive'),
+              },
+              {
+                name: 'hydration',
+                type: {
+                  type: 'record',
+                  name: 'HydrationMetadata',
+                  fields: [
+                    {
+                      name: 'directive',
+                      type: 'string',
+                    },
+                    {
+                      name: 'value',
+                      type: 'string',
+                    },
+                    {
+                      name: 'componentUrl',
+                      type: 'string',
+                    },
+                    {
+                      name: 'componentExport',
+                      type: {
+                        type: 'record',
+                        name: 'ComponentExport',
+                        fields: [{
+                          name: 'value',
+                          type: 'string',
+                        }],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          {
+            type: 'record',
+            name: 'RenderHeadInstruction',
+            fields: [{
+              name: 'type',
+              type: literalType('head'),
+            }],
+          },
+          {
+            type: 'record',
+            name: 'MaybeRenderHeadInstruction',
+            fields: [{
+              name: 'type',
+              type: literalType('maybe-head'),
+            }],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    type: 'record',
+    name: 'SerializedSlotString',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('slotString'),
+      },
+      {
+        name: 'instruction',
+        type: [
+          'RenderDirectiveInstruction',
+          'RenderHeadInstruction',
+          'MaybeRenderHeadInstruction',
+        ],
+      }
+    ],
+  },
+  {
+    type: 'record',
+    name: 'SerializedArrayBufferView',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('arrayBufferView'),
+      },
+      {
+        name: 'value',
+        type: 'bytes'
+      },
+    ],
+  },
+  {
+    type: 'record',
+    name: 'SerializedResponse',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('response'),
+      },
+      {
+        name: 'body',
+        type: 'string',
+      },
+      {
+        name: 'status',
+        type: 'int',
+      },
+      {
+        name: 'statusText',
+        type: 'string',
+      },
+      {
+        name: 'headers',
+        type: {
+          type: 'map',
+          values: 'string'
+        },
+      },
+    ]
+  }
+];
+
+const serializedValueAvro = avsc.Type.forSchema([
+  {
+    type: 'record',
+    name: 'SerializedTemplateResult',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('templateResult'),
+      },
+      {
+        name: 'chunks',
+        type: {
+          type: 'array',
+          items: serializedChunksAvro,
+        },
+      }
+    ],
+  },
+  {
+    type: 'record',
+    name: 'SerializedTemplateResult',
+    fields: [
+      {
+        name: 'type',
+        type: literalType('headAndContent'),
+      },
+      {
+        name: 'head',
+        type: 'string',
+      },
+      {
+        name: 'chunks',
+        type: {
+          type: 'array',
+          items: serializedChunksAvro,
+        },
+      }],
+  },
+  serializedChunksAvro.at(-1)!,
+], {
+  logicalTypes,
+  wrapUnions: (types) => {
+    if (!types.every(typ => (
+      typ instanceof avsc.types.RecordType
+      && typ.fields[0]?.type instanceof avsc.types.EnumType
+      && typ.fields[0].type.symbols.length === 1
+    ))) return;
+
+    debugger;
+
+    // Discriminated union
+    const discriminators = types.map(
+      typ => (
+        (typ as avsc.types.RecordType).fields[0]!
+          .type as avsc.types.EnumType
+      ).symbols[0]!
+    );
+
+    return (val) => discriminators.indexOf(val);
+  },
+})
+
 type SerializedValue<K extends keyof ValueSerializationMap = keyof ValueSerializationMap> = {
   [T in K]: ValueSerializationMap[T] & { type: T }
 }[K];
@@ -82,6 +325,107 @@ export type SerializedMetadata = Omit<ContextTracking, 'doNotCache' | 'rendering
     extraHead: string[];
   }
 }
+
+const serializedMetadataAvro = avsc.Type.forSchema({
+  type: 'record',
+  name: 'SerializedMetadata',
+  fields: [
+    {
+      name: 'assetServiceCalls',
+      type: {
+        type: 'array',
+        items: {
+          type: 'record',
+          name: 'AssetServiceCalls',
+          fields: [
+            {
+              name: 'options',
+              type: commonTypes.innerJson,
+            },
+            {
+              name: 'resultingAttributes',
+              type: {
+                type: 'map',
+                values: commonTypes.primitive,
+              },
+            },
+          ],
+        }
+      },
+    },
+    {
+      name: 'renderEntryCalls',
+      type: {
+        type: 'array',
+        items: {
+          type: 'record',
+          name: 'RenderEntryCalls',
+          fields: [
+            {
+              name: 'id',
+              type: 'string',
+            },
+            {
+              name: 'filePath',
+              type: 'string',
+            },
+            {
+              name: 'hash',
+              type: 'string',
+            },
+          ],
+        }
+      },
+    },
+    {
+      name: 'nestedComponents',
+      type: {
+        type: 'map',
+        values: 'string',
+      },
+    },
+    {
+      name: 'metadata',
+      type: {
+        type: 'record',
+        name: 'SSRMetadata',
+        fields: [
+          {
+            name: 'hasHydrationScript',
+            type: 'boolean'
+          },
+          {
+            name: 'rendererSpecificHydrationScripts',
+            type: commonTypes.stringArray,
+          },
+          {
+            name: 'renderedScripts',
+            type: commonTypes.stringArray,
+          },
+          {
+            name: 'hasDirectives',
+            type: commonTypes.stringArray,
+          },
+          {
+            name: 'hasRenderedHead',
+            type: 'boolean'
+          },
+          {
+            name: 'headInTree',
+            type: 'boolean'
+          },
+          {
+            name: 'extraHead',
+            type: {
+              type: 'array',
+              items: commonTypes.htmlString,
+            }
+          },
+        ],
+      }
+    }
+  ]
+}, { logicalTypes });
 
 const debug = rootDebug.extend('file-store');
 
@@ -122,7 +466,7 @@ export class RenderFileStore {
     const { denormalized, clone } = await RenderFileStore.denormalizeValue(value);
 
     if (denormalized) {
-      this.store(key + ':renderer', denormalized);
+      this.store(key + ':renderer', serializedValueAvro.toBuffer(denormalized));
     }
 
     return clone;
@@ -130,12 +474,13 @@ export class RenderFileStore {
 
   public async loadRenderer(key: string): Promise<ValueThunk | null> {
     try {
-      const serializedValue: SerializedValue | null = await this.load(key + ':renderer');
-
-      if (!serializedValue) {
+      const storedBuf = await this.load(key + ':renderer');
+      if (!storedBuf) {
         debug('Renderer cache miss', key);
         return null;
       }
+
+      const serializedValue: SerializedValue = serializedValueAvro.fromBuffer(storedBuf);
 
       debug('Renderer cache hit', key);
       fsCacheHit();
@@ -161,16 +506,18 @@ export class RenderFileStore {
       },
     };
 
-    this.store(key + ':metadata', serialized);
+    this.store(key + ':metadata', serializedMetadataAvro.toBuffer(serialized));
   }
 
   public async loadMetadata(key: string): Promise<PersistedMetadata | null> {
     try {
-      const serializedValue: SerializedMetadata | null = await this.load(key + ':metadata');
-      if (!serializedValue) {
+      const storedBuf = await this.load(key + ':metadata', false);
+      if (!storedBuf) {
         debug('Metadata cache miss', key);
         return null;
       }
+
+      const serializedValue: SerializedMetadata = serializedMetadataAvro.fromBuffer(storedBuf);
 
       debug('Metadata cache hit', key);
       fsCacheHit();
@@ -312,7 +659,7 @@ export class RenderFileStore {
 
     if (chunk instanceof runtime.HTMLBytes) return {
       type: 'htmlBytes',
-      value: Buffer.from(chunk).toString('base64'),
+      value: Buffer.from(chunk),
     };
 
     if (chunk instanceof runtime.SlotString) {
@@ -343,7 +690,7 @@ export class RenderFileStore {
       value: Buffer.from(chunk.buffer.slice(
         chunk.byteOffset,
         chunk.byteOffset + chunk.byteLength,
-      )).toString('base64')
+      )),
     }
 
     if (RenderFileStore.isSerializableRenderInstruction(chunk)) return {
@@ -366,7 +713,7 @@ export class RenderFileStore {
       case "htmlString":
         return new runtime.HTMLString(chunk.value);
       case "htmlBytes":
-        return new runtime.HTMLBytes(Buffer.from(chunk.value, 'base64'));
+        return new runtime.HTMLBytes(chunk.value);
       case "slotString":
         return new runtime.SlotString(
           chunk.value,
@@ -376,7 +723,7 @@ export class RenderFileStore {
       case "renderInstruction":
         return RenderFileStore.normalizeRenderInstruction(chunk.instruction);
       case "arrayBufferView": {
-        const buffer = Buffer.from(chunk.value, 'base64');
+        const buffer = chunk.value;
         return {
           buffer: buffer.buffer,
           byteLength: buffer.length,
