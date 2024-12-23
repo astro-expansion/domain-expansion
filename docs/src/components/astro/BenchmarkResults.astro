@@ -7,15 +7,15 @@ const results = await getCollection('benchmark');
 
 <ul class="legend not-content">
   <li class="legend-item">
-    <div class="legend-color teal"></div>
+    <span class="legend-color teal"></span>
     <span>With Domain Expansion enabled, subsequent builds (with cache)</span>
   </li>
   <li class="legend-item">
-    <div class="legend-color sapphire"></div>
+    <span class="legend-color sapphire"></span>
     <span>With Domain Expansion enabled, initial build</span>
   </li>
   <li class="legend-item">
-    <div class="legend-color lavender"></div>
+    <span class="legend-color lavender"></span>
     <span>Without Domain Expansion</span>
   </li>
 </ul>
@@ -83,18 +83,22 @@ const results = await getCollection('benchmark');
     gap: .25rem;
     margin: 0;
     padding: 0;
+    list-style: none;
   }
 
-  .legend-item {
-    display: flex;
-    gap: .5rem;
-    align-items: center;
+  .legend-item span {
+    font-size: 0.875rem;
   }
 
   .legend-color {
     width: 1rem;
     height: 1rem;
+    min-width: 1rem;
     border-radius: 4px;
+    display: inline-block;
+    margin-right: .5rem;
+    top: 3px;
+    position: relative;
   }
 
   .teal {
