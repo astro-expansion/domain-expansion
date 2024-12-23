@@ -25,7 +25,7 @@ const keyMap = {
     color: "#74c7ec",
   },
   hot: {
-    label: "With DE\nsub. runs",
+    label: "With DE, sub. runs",
     color: "#94e2d5",
   },
 }
