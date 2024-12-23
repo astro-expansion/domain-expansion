@@ -33,13 +33,17 @@ const keyMap = {
 export function BenchmarkChart({ results }: { results: CollectionEntry<'benchmark'> }) {
   const formatted = Object.keys(results.data.benchmark.means).map((key) => ({
     name: key,
-    duration: results.data.benchmark.means[key as keyof typeof results.data.benchmark.means],
-    durationFormatted: prettyMs(
-      results.data.benchmark.means[key as keyof typeof results.data.benchmark.means] * 1000,
-      { compact: true }
-    ),
+    duration: results.data.benchmark.means[key as keyof typeof results.data.benchmark.means].mean,
+    stdDev: results.data.benchmark.means[key as keyof typeof results.data.benchmark.means].stdDev,
     color: keyMap[key as keyof typeof keyMap].color,
-  })).sort((a, b) => a.duration - b.duration);
+  })).sort((a, b) => {
+    // name: hot > cold > standard
+    if (a.name === "hot") return 1;
+    if (b.name === "hot") return -1;
+    if (a.name === "cold") return 1;
+    if (b.name === "cold") return -1;
+    return 0;
+  }).reverse();
 
   return (
     <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
@@ -70,8 +74,10 @@ export function BenchmarkChart({ results }: { results: CollectionEntry<'benchmar
                       } as React.CSSProperties
                     }
                   />
-                  ~{prettyMs(
+                  {prettyMs(
                     Math.floor((value as number)) * 1000,
+                  )} ± {prettyMs(
+                    Math.floor((formatted.find((x) => x.duration === value)?.stdDev || 0) * 1000),
                   )}
                 </div>
               )}

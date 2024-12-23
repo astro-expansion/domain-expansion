@@ -9,9 +9,18 @@ const benchmarkSchema = z.object({
 	url: z.string(),
 	benchmark: z.object({
 		means: z.object({
-			standard: z.number(),
-			cold: z.number(),
-			hot: z.number(),
+			standard: z.object({
+				mean: z.number(),
+				stdDev: z.number(),
+			}),
+			cold: z.object({
+				mean: z.number(),
+				stdDev: z.number(),
+			}),
+			hot: z.object({
+				mean: z.number(),
+				stdDev: z.number(),
+			}),
 		})
 	})
 });

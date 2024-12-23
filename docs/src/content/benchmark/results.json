@@ -5,9 +5,18 @@
     "url": "https://docs.astro.build",
     "benchmark": {
       "means": {
-        "standard": 263.283,
-        "cold": 272.885,
-        "hot": 143.194
+        "standard": {
+          "mean": 263.283,
+          "stdDev": 13.774
+        },
+        "cold": {
+          "mean": 272.885,
+          "stdDev": 15.867
+        },
+        "hot": {
+          "mean": 143.194,
+          "stdDev": 4.299
+        }
       }
     }
   },
@@ -17,9 +26,18 @@
     "url": "https://astro.build",
     "benchmark": {
       "means": {
-        "standard": 31.765,
-        "cold": 32.254,
-        "hot": 31.753
+        "standard": {
+          "mean": 31.765,
+          "stdDev": 2.319
+        },
+        "cold": {
+          "mean": 32.254,
+          "stdDev": 1.543
+        },
+        "hot": {
+          "mean": 31.753,
+          "stdDev": 2.143
+        }
       }
     }
   },
@@ -29,9 +47,18 @@
     "url": "https://starlight.astro.build",
     "benchmark": {
       "means": {
-        "standard": 32.911,
-        "cold": 35.339,
-        "hot": 29.426
+        "standard": {
+          "mean": 32.911,
+          "stdDev": 2.103
+        },
+        "cold": {
+          "mean": 35.339,
+          "stdDev": 2.628
+        },
+        "hot": {
+          "mean": 29.426,
+          "stdDev": 1.881
+        }
       }
     }
   },
@@ -41,9 +68,18 @@
     "url": "https://ui.studiocms.dev",
     "benchmark": {
       "means": {
-        "standard": 10.498,
-        "cold": 11.004,
-        "hot": 9.849
+        "standard": {
+          "mean": 10.498,
+          "stdDev": 0.404
+        },
+        "cold": {
+          "mean": 11.004,
+          "stdDev": 0.534
+        },
+        "hot": {
+          "mean": 9.849,
+          "stdDev": 0.463
+        }
       }
     }
   },
@@ -53,9 +89,18 @@
     "url": "https://zen-browser.app",
     "benchmark": {
       "means": {
-        "standard": 14.983,
-        "cold": 17.880,
-        "hot": 17.490
+        "standard": {
+          "mean": 14.983,
+          "stdDev": 0.631
+        },
+        "cold": {
+          "mean": 17.880,
+          "stdDev": 0.603
+        },
+        "hot": {
+          "mean": 17.490,
+          "stdDev": 0.469
+        }
       }
     }
   }

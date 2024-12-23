@@ -183,8 +183,6 @@ if ! is_excluded "brutal"; then
   echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
-    --show-output \
-    --runs 1 \
     --export-markdown "$ROOT/.results/brutal.md" \
     -n '[Brutal Theme] Normal Build' \
     --prepare '' \
@@ -246,8 +244,6 @@ if ! is_excluded "astro.build"; then
 
   hyperfine \
     --export-markdown "$ROOT/.results/astro.build.md" \
-    --runs 1 \
-    --show-output \
     --prepare '' \
     -n '[astro.build] Normal Build' \
     'pnpm astro build' \
