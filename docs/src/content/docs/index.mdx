@@ -4,20 +4,22 @@ description: And they said incremental builds in Astro weren't possible.
 ---
 
 import { Tabs, TabItem, Badge } from '@astrojs/starlight/components';
+import BenchmarkResults from '../../components/astro/BenchmarkResults.astro';
 
 Domain Expansion is an Astro integration that adds support for incremental builds. Basically,
 builds go weee now.
 
 ## Benchmarks
 
-<Badge text="TODO: PUT GRAFANA BENCHMARKS HERE" />
+Here's how Domain Expansion performs against the default Astro build, both in a cold and hot build scenario.
 
-1. Astro Docs, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
-2. Starlight docs, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
-3. astro.build, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
-4. Astrowind basic install, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
-5. Cloudflare docs, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
-6. StudioCMS/UI Docs, time to build (domain expansion (cold build) vs domain expansion (hot build) vs default)
+<BenchmarkResults />
+
+You can read more about the benchmarks in the [benchmarks README](https://github.com/astro-expansion/domain-expansion/tree/main/benchmarks) 
+on our GitHub repository.
+
+Basically - the bigger the site, the more you'll see Domain Expansion shine. You can read more about the
+trade-offs on the [caveats page](/caveats).
 
 ## Installation
 

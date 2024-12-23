@@ -2,6 +2,16 @@
 title: Caveats
 ---
 
+## Diminishing Returns
+
+Let's get this out of the way first: Domain Expansion is not a silver bullet. This won't speed up every build process to below 10ms. In fact, in certain cases,
+it might even slow down your build times due to the caching overhead. Here's the general rule of thumb:
+
+1. If you have a fast CPU, you won't see significant improvements. We can only speed up the build process so much.
+2. On small sites you won't see any improvements, and might even see a slowdown.
+
+This extension is great for big projects and slow CPUs, but it's not a one-size-fits-all solution.
+
 ## Engines
 
 Domain Expansion is *very* particular about the build environment, and requires you to use Node.js. This is because the integration relies on functions that are only available in V8,
