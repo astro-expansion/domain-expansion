@@ -8,7 +8,7 @@ EXCLUED_BENCHMARKS=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --excluded=*)
+    --exclude=*)
       excluded_list="${1#*=}" # Extract the value after '='
       shift
       ;;
@@ -114,10 +114,13 @@ if ! is_excluded "zen-browser"; then
 
   echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}zen-browser/www${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
-  pnpm install &> /dev/null
-  pnpm build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  yes | pnpm install &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  pnpm build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
     --export-markdown "$ROOT/.results/zen-browser.md" \
@@ -141,15 +144,17 @@ if ! is_excluded "studiocms-ui"; then
 
   echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}withstudiocms/ui${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
-  pnpm install &> /dev/null
-  pnpm build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  yes | pnpm install &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  pnpm build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
     --export-markdown "$ROOT/.results/studiocms-ui.md" \
     --prepare '' \
-    --runs 1 \
     -n '[StudioCMS UI Docs] Normal Build' \
     'pnpm astro build' \
     --prepare 'pnpm astro add @domain-expansion/astro -y && rm -rf ./node_modules/.domain-expansion' \
@@ -169,12 +174,16 @@ if ! is_excluded "brutal"; then
 
   echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}eliancodes/brutal${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
-  pnpm install &> /dev/null
-  pnpm build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  yes | pnpm install &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  pnpm build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
+    --show-output \
     --export-markdown "$ROOT/.results/brutal.md" \
     -n '[Brutal Theme] Normal Build' \
     --prepare '' \
@@ -196,12 +205,16 @@ if ! is_excluded "starlight"; then
 
   echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}withastro/starlight${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
-  pnpm install &> /dev/null
-  pnpm build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  yes | pnpm install &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  pnpm build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
+    --show-output \
     --export-markdown "$ROOT/.results/starlight.md" \
     --prepare '' \
     -n '[Starlight Docs] Normal Build' \
@@ -223,10 +236,13 @@ if ! is_excluded "cloudflare-docs"; then
 
   echo -e "\n${F_BOLD}Running Setup for ${C_STEELBLUE1}cloudflare/cloudflare-docs${NO_FORMAT}${F_BOLD}...${NO_FORMAT}"
 
+  echo -e "  Running ${C_STEELBLUE1}npm install${NO_FORMAT}..."
   npm install &> /dev/null
-  npm run build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}npm run build${NO_FORMAT}..."
+  npm run build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
     --export-markdown "$ROOT/.results/cloudflare-docs.md" \
@@ -253,10 +269,13 @@ if ! is_excluded "astro-docs"; then
 
   export NODE_OPTIONS=--max-old-space-size=12192 SKIP_OG=true;
 
-  pnpm install &> /dev/null
-  pnpm build &> /dev/null
+  echo -e "  Running ${C_STEELBLUE1}pnpm install${NO_FORMAT}..."
+  yes | pnpm install &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}"
 
-  echo -e "  ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
+  echo -e "  Running ${C_STEELBLUE1}pnpm build${NO_FORMAT}..."
+  pnpm build &> /dev/null
+  echo -e "    ${C_MEDIUMSPRINGGREEN}Done!${NO_FORMAT}\n"
 
   hyperfine \
     --export-markdown "$ROOT/.results/astro-docs.md" \
