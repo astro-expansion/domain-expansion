@@ -43,7 +43,7 @@ jobs:
         run: pnpm install
 
       - name: Build Packages
-        run: pnpm run build
+        run: pnpm run package:build
 
       - name: Publish preview
         if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
