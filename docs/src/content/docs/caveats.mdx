@@ -33,7 +33,7 @@ Domain Expansion does not invalidate external content, recompute usage of random
 
 ## Astro Versions
 
-Domain Expansion relies on how two very functions are exported from Astro. Specifically where and how `$$createComponent`
+Domain Expansion relies on how two very specific functions are exported from Astro. Specifically where and how `$$createComponent`
 and `getImage` are declared and exported from. If these functions are moved or changed in any way, Domain Expansion
 will break. Since those functions are part of Astro's internal API, they can change at any time, even on patch releases.
 

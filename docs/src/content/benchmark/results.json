@@ -27,16 +27,16 @@
     "benchmark": {
       "means": {
         "standard": {
-          "mean": 31.765,
-          "stdDev": 2.319
+          "mean": 30.852,
+          "stdDev": 3.303
         },
         "cold": {
-          "mean": 32.254,
-          "stdDev": 1.543
+          "mean": 31.298,
+          "stdDev": 2.398
         },
         "hot": {
-          "mean": 31.753,
-          "stdDev": 2.143
+          "mean": 30.660,
+          "stdDev": 1.442
         }
       }
     }
@@ -48,16 +48,16 @@
     "benchmark": {
       "means": {
         "standard": {
-          "mean": 32.911,
-          "stdDev": 2.103
+          "mean": 34.021,
+          "stdDev": 2.990
         },
         "cold": {
-          "mean": 35.339,
-          "stdDev": 2.628
+          "mean": 35.049,
+          "stdDev": 1.906
         },
         "hot": {
-          "mean": 29.426,
-          "stdDev": 1.881
+          "mean": 29.722,
+          "stdDev": 3.016
         }
       }
     }
@@ -69,16 +69,16 @@
     "benchmark": {
       "means": {
         "standard": {
-          "mean": 10.498,
-          "stdDev": 0.404
+          "mean": 10.523,
+          "stdDev": 0.455
         },
         "cold": {
-          "mean": 11.004,
-          "stdDev": 0.534
+          "mean": 10.721,
+          "stdDev": 0.472
         },
         "hot": {
-          "mean": 9.849,
-          "stdDev": 0.463
+          "mean": 9.826,
+          "stdDev": 0.462
         }
       }
     }
@@ -94,12 +94,33 @@
           "stdDev": 0.631
         },
         "cold": {
-          "mean": 17.88,
+          "mean": 17.880,
           "stdDev": 0.603
         },
         "hot": {
-          "mean": 17.49,
+          "mean": 17.490,
           "stdDev": 0.469
+        }
+      }
+    }
+  },
+  {
+    "id": 6,
+    "name": "Brutal",
+    "url": "https://brutal.elian.codes",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 4.491,
+          "stdDev": 0.312
+        },
+        "cold": {
+          "mean": 4.638,
+          "stdDev": 0.298
+        },
+        "hot": {
+          "mean": 4.492,
+          "stdDev": 0.266
         }
       }
     }

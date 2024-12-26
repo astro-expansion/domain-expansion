@@ -34,7 +34,6 @@ import {
   renderTransition as $$renderTransition,
   createTransitionScope as $$createTransitionScope,
   renderScript as $$renderScript,
-
 } from "astro/runtime/server/index.js";
 import Foo from './Foo.astro';
 import Bar from './Bar.astro';

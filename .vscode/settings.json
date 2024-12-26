@@ -1,3 +1,4 @@
 {
-  "editor.defaultFormatter": "prettier"
+  "editor.defaultFormatter": "prettier",
+  "editor.gotoLocation.multipleDefinitions": "goto"
 }
