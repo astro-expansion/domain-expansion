@@ -31,7 +31,7 @@
   "scripts": {
     "dev": "tsup --watch",
     "build": "tsup",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "test:dev": "vitest",
     "test:debug": "vitest run --inspect --no-file-parallelism --testTimeout 1000000"
   },
