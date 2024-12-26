@@ -1,52 +1,52 @@
 {
-	"name": "@domain-expansion/astro",
-	"version": "0.0.0",
-	"description": "Expanding™ the™ bits™ since™ 2024-12-12™",
-	"contributors": [
-		"Luiz Ferraz (https://github.com/Fryuni)",
-		"Louis Escher (https://github.com/louisescher)",
-		"Reuben Tier (https://github.com/theotterlord)"
-	],
-	"license": "MIT",
-	"keywords": [
-		"astro-integration",
-		"astro-component",
-		"withastro",
-		"astro"
-	],
-	"homepage": "https://github.com/astro-expansion/domain-expansion",
-	"publishConfig": {
-		"access": "public"
-	},
-	"sideEffects": false,
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
-		}
-	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"dev": "tsup --watch",
-		"build": "tsup"
-	},
-	"type": "module",
-	"peerDependencies": {
-		"astro": "^5.0.0"
-	},
-	"dependencies": {
-		"astro-integration-kit": "^0.17.0",
-		"debug": "^4.4.0",
-		"hash-sum": "^2.0.0",
-		"magic-string": "^0.30.15"
-	},
-	"devDependencies": {
-		"@types/debug": "^4.1.12",
-		"@types/hash-sum": "^1.0.2",
-		"@types/node": "^22.10.2",
-		"tsup": "^8.3.5",
-		"vite": "^6.0.3"
-	}
+  "name": "@domain-expansion/astro",
+  "version": "0.0.0",
+  "description": "Expanding™ the™ bits™ since™ 2024-12-12™",
+  "contributors": [
+    "Luiz Ferraz (https://github.com/Fryuni)",
+    "Louis Escher (https://github.com/louisescher)",
+    "Reuben Tier (https://github.com/theotterlord)"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "astro-integration",
+    "astro-component",
+    "withastro",
+    "astro"
+  ],
+  "homepage": "https://github.com/astro-expansion/domain-expansion",
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup --watch",
+    "build": "tsup"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "dependencies": {
+    "astro-integration-kit": "^0.17.0",
+    "debug": "^4.4.0",
+    "hash-sum": "^2.0.0",
+    "magic-string": "^0.30.15"
+  },
+  "devDependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/hash-sum": "^1.0.2",
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "vite": "^6.0.3"
+  }
 }
