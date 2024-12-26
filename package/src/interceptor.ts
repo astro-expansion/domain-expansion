@@ -3,12 +3,14 @@ import type { AstNode, TransformPluginContext } from 'rollup';
 import { walk, type Node as ETreeNode } from 'estree-walker';
 import { rootDebug } from './debug.js';
 import { AstroError } from 'astro/errors';
-import { makeCaching } from './renderCaching.js';
+import { setCachingOptions } from './contextTracking.js';
 import { Cache } from './cache.js';
 import { createResolver } from 'astro-integration-kit';
 import MagicString, { type SourceMap } from 'magic-string';
 import hash_sum from 'hash-sum';
 import assert from 'node:assert';
+import './renderCaching.js';
+import { randomBytes } from 'node:crypto';
 
 const debug = rootDebug.extend('interceptor-plugin');
 
@@ -16,6 +18,7 @@ const MODULE_ID = 'virtual:domain-expansion';
 const RESOLVED_MODULE_ID = '\x00virtual:domain-expansion';
 
 const EXCLUDED_MODULE_IDS: string[] = [
+  RESOLVED_MODULE_ID,
   '\0astro:content',
   '\0astro:assets',
 ];
@@ -25,21 +28,27 @@ type ParseNode = ETreeNode & AstNode;
 export const interceptorPlugin = (options: {
   cacheComponents: false | 'in-memory' | 'persistent',
   cachePages: boolean,
+  componentsHaveSharedState: boolean,
   routeEntrypoints: string[],
-}): Plugin => {
+  cachePrefix: string,
+}): { plugin: Plugin, cleanup: () => Promise<void> } => {
   const componentHashes = new Map<string, string>();
 
-  return {
+  let cache: Cache;
+
+  const plugin: Plugin = {
     name: '@domain-expansion/interceptor',
     enforce: 'post',
     async configResolved(config) {
       const { resolve: resolver } = createResolver(config.root);
 
-      const cache = new Cache(resolver('node_modules/.domain-expansion'));
+      cache = new Cache(
+        resolver(`node_modules/.domain-expansion/${options.cachePrefix}`),
+      );
 
       await cache.initialize();
 
-      (globalThis as any)[Symbol.for('@domain-expansion:astro-component-caching')] = makeCaching({
+      setCachingOptions({
         ...options,
         cache,
         root: config.root,
@@ -58,7 +67,7 @@ export const interceptorPlugin = (options: {
 
       // Return unchanged functions when not in a shared context with the build pipeline
       // AKA. During server rendering
-      return `
+      const code = `
 import { HTMLBytes, HTMLString } from "astro/runtime/server/index.js";
 import { SlotString } from "astro/runtime/server/render/slot.js";
 import { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
@@ -85,6 +94,10 @@ export const domainExpansionAssets = globalThis[assetTrackingSym] ?? ((fn) => fn
 const ccRenderTrackingSym = Symbol.for('@domain-expansion:astro-cc-render-tracking');
 export const domainExpansionRenderEntry = globalThis[ccRenderTrackingSym] ?? ((fn) => fn);
 `;
+
+      if (process.env.TEST) return code + `domainExpansionAssets(${JSON.stringify(randomBytes(8).toString('hex'))});`;
+
+      return code;
     },
     async transform(code, id, { ssr } = {}) {
       if (!ssr) return;
@@ -131,7 +144,12 @@ export const domainExpansionRenderEntry = globalThis[ccRenderTrackingSym] ?? ((f
         componentHashes.set(rootName, hash_sum(hashParts));
       }
     },
-  }
+  };
+
+  return {
+    plugin,
+    cleanup: () => cache.flush(),
+  };
 }
 
 type Transformer = (ctx: TransformPluginContext, code: string, id: string) => TransformResult | null;

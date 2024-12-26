@@ -1,5 +1,17 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.7
+
+### Minor Changes
+
+- cf9e4ea: Eagerly normalize loaded chunks
+
+## 0.1.0-beta.6
+
+### Minor Changes
+
+- 8684bcb: Add configuration for components using shared state
+
 ## 0.1.0-beta.5
 
 ### Minor Changes

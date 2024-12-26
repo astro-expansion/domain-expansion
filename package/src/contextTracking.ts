@@ -8,6 +8,8 @@ import * as fs from "node:fs";
 import type { renderEntry } from "astro/content/runtime";
 import type { UnresolvedImageTransform } from "astro";
 import { getSystemErrorName, types } from "node:util";
+import { createResolver } from "astro-integration-kit";
+import type { Cache } from './cache.js';
 
 export type ContextTracking = {
   assetServiceCalls: Array<{
@@ -26,6 +28,28 @@ export type ContextTracking = {
 
 const debug = rootDebug.extend('context-tracking');
 const contextTracking = new AsyncLocalStorage<ContextTracking>();
+
+let cachingOptions: {
+  cache: Cache,
+  root: string,
+  routeEntrypoints: string[],
+  componentHashes: Map<string, string>,
+  cacheComponents: false | 'in-memory' | 'persistent',
+  cachePages: boolean,
+  componentsHaveSharedState: boolean,
+  resolver: ReturnType<typeof createResolver>['resolve'],
+};
+
+export function setCachingOptions(options: Omit<typeof cachingOptions, 'resolver'>) {
+  cachingOptions = {
+    ...options,
+    resolver: createResolver(options.root).resolve,
+  };
+}
+
+export function getCachingOptions(): typeof cachingOptions {
+  return cachingOptions;
+}
 
 export function makeContextTracking(): {
   runIn: <T>(fn: () => T) => T,
@@ -69,15 +93,14 @@ export function getCurrentContext(): ContextTracking | undefined {
 
 const assetTrackingSym = Symbol.for('@domain-expansion:astro-asset-tracking');
 (globalThis as any)[assetTrackingSym] = (original: typeof getImage): typeof getImage => {
-  runtime.getImage = original;
   debug('Wrapping getImage');
-  return async (options) => {
+  return runtime.getImage = async (options) => {
     const result = await original(options);
 
     const context = contextTracking.getStore();
     if (context) {
       const val: PersistedMetadata['assetServiceCalls'][number] = {
-        options,
+        options: result.rawOptions,
         resultingAttributes: result.attributes,
       };
       debug('Collected getImage call', val);
@@ -90,7 +113,12 @@ const assetTrackingSym = Symbol.for('@domain-expansion:astro-asset-tracking');
 
 export async function computeEntryHash(filePath: string): Promise<string> {
   try {
-    return createHash('sha1').update(await fs.promises.readFile(filePath)).digest().toString('hex');
+    return createHash('sha1')
+      .update(
+        await fs.promises.readFile(cachingOptions.resolver(filePath)),
+      )
+      .digest()
+      .toString('hex');
   } catch (err) {
     if (
       types.isNativeError(err)
@@ -108,9 +136,8 @@ export async function computeEntryHash(filePath: string): Promise<string> {
 
 const ccRenderTrackingSym = Symbol.for('@domain-expansion:astro-cc-render-tracking');
 (globalThis as any)[ccRenderTrackingSym] = (original: typeof renderEntry): typeof renderEntry => {
-  runtime.renderEntry = original;
   debug('Wrapping renderEntry');
-  return async (entry) => {
+  return runtime.renderEntry = async (entry) => {
     const context = contextTracking.getStore();
     if (!context) return original(entry);
 

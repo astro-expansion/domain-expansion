@@ -1,0 +1,10 @@
+{
+  "name": "@domain-expansion-test/basic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@domain-expansion/astro": "workspace:",
+    "astro": "catalog:"
+  }
+}

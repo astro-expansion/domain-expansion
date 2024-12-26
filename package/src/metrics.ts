@@ -24,4 +24,12 @@ export const trackStoredData = makeTracker('stored-data-size');
 export const trackLoadedCompressedData = makeTracker('loaded-compressed-size');
 export const trackStoredCompressedData = makeTracker('stored-compressed-size');
 
-export const collectMetrics = (): Record<Metrics, number> => ({ ...metricState } as Record<Metrics, number>);
+export type CollectedMetrics = Record<Metrics, number>;
+
+export const collectMetrics = (): CollectedMetrics => ({ ...metricState } as CollectedMetrics);
+
+export const clearMetrics = (): void => {
+  for (const key in metricState) {
+    metricState[key] = 0;
+  }
+}
