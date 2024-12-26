@@ -1,12 +1,12 @@
-import { defineConfig } from "tsup";
-import { peerDependencies, dependencies, devDependencies } from "./package.json";
+import { defineConfig } from 'tsup';
+import { peerDependencies, dependencies, devDependencies } from './package.json';
 
 export default defineConfig((options) => {
 	const dev = !!options.watch;
 	return {
-		entry: ["src/index.ts"],
-		format: ["esm"],
-		target: "node18",
+		entry: ['src/index.ts'],
+		format: ['esm'],
+		target: 'node18',
 		bundle: true,
 		dts: true,
 		sourcemap: true,
@@ -21,7 +21,7 @@ export default defineConfig((options) => {
 			'recast',
 			'tslib',
 		],
-		tsconfig: "tsconfig.json",
+		tsconfig: 'tsconfig.json',
 		treeshake: 'smallest',
 	};
 });

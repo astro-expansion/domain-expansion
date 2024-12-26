@@ -206,8 +206,8 @@ A code block is indicated by a block with three backticks <code>```</code> at th
 ```js
 // Javascript code with syntax highlighting.
 var fun = function lang(l) {
-  dateformat.i18n = require("./lang/" + l);
-  return true;
+	dateformat.i18n = require('./lang/' + l);
+	return true;
 };
 ```
 
@@ -215,8 +215,8 @@ var fun = function lang(l) {
 ```js
 // Javascript code with syntax highlighting.
 var fun = function lang(l) {
-  dateformat.i18n = require("./lang/" + l);
-  return true;
+	dateformat.i18n = require('./lang/' + l);
+	return true;
 };
 ```
 ````
@@ -244,16 +244,16 @@ Some of the most common examples are shown below:
 
   ```js {2-3}
   function demo() {
-    // This line (#2) and the next one are highlighted
-    return "This is line #3 of this snippet";
+  	// This line (#2) and the next one are highlighted
+  	return 'This is line #3 of this snippet';
   }
   ```
 
   ````md
   ```js {2-3}
   function demo() {
-    // This line (#2) and the next one are highlighted
-    return "This is line #3 of this snippet";
+  	// This line (#2) and the next one are highlighted
+  	return 'This is line #3 of this snippet';
   }
   ```
   ````
@@ -263,7 +263,7 @@ Some of the most common examples are shown below:
   ```js "Individual terms" /Even.*supported/
   // Individual terms can be highlighted, too
   function demo() {
-    return "Even regular expressions are supported";
+  	return 'Even regular expressions are supported';
   }
   ```
 
@@ -271,7 +271,7 @@ Some of the most common examples are shown below:
   ```js "Individual terms" /Even.*supported/
   // Individual terms can be highlighted, too
   function demo() {
-    return "Even regular expressions are supported";
+  	return 'Even regular expressions are supported';
   }
   ```
   ````
@@ -280,18 +280,18 @@ Some of the most common examples are shown below:
 
   ```js "return true;" ins="inserted" del="deleted"
   function demo() {
-    console.log("These are inserted and deleted marker types");
-    // The return statement uses the default marker type
-    return true;
+  	console.log('These are inserted and deleted marker types');
+  	// The return statement uses the default marker type
+  	return true;
   }
   ```
 
   ````md
   ```js "return true;" ins="inserted" del="deleted"
   function demo() {
-    console.log("These are inserted and deleted marker types");
-    // The return statement uses the default marker type
-    return true;
+  	console.log('These are inserted and deleted marker types');
+  	// The return statement uses the default marker type
+  	return true;
   }
   ```
   ````
@@ -330,13 +330,13 @@ A code block’s optional title can be set either with a `title="..."` attribute
 
   ```js
   // my-test-file.js
-  console.log("Hello World!");
+  console.log('Hello World!');
   ```
 
   ````md
   ```js
   // my-test-file.js
-  console.log("Hello World!");
+  console.log('Hello World!');
   ```
   ````
 
@@ -405,7 +405,7 @@ Starlight supports authoring content in Markdoc using the experimental [Astro Ma
 
 Start a new Starlight project with Markdoc pre-configured using `create astro`:
 
-import { Tabs, TabItem, Steps } from "@astrojs/starlight/components";
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components';
 
 <Tabs syncKey="pkg">
 <TabItem label="npm">
@@ -500,11 +500,11 @@ If you already have a Starlight site and want to add Markdoc, follow these steps
 3.  Create a Markdoc configuration file at `markdoc.config.mjs` and use the Starlight Markdoc preset:
 
     ```js
-    import { defineMarkdocConfig } from "@astrojs/markdoc/config";
-    import starlightMarkdoc from "@astrojs/starlight-markdoc";
+    import { defineMarkdocConfig } from '@astrojs/markdoc/config';
+    import starlightMarkdoc from '@astrojs/starlight-markdoc';
 
     export default defineMarkdocConfig({
-      extends: [starlightMarkdoc()],
+    	extends: [starlightMarkdoc()],
     });
     ```
 

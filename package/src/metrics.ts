@@ -1,18 +1,20 @@
 type Metrics =
-  | 'in-memory-cache-hit'
-  | 'in-memory-cache-miss'
-  | 'fs-cache-hit'
-  | 'fs-cache-miss'
-  | 'loaded-data-size'
-  | 'stored-data-size'
-  | 'loaded-compressed-size'
-  | 'stored-compressed-size';
+	| 'in-memory-cache-hit'
+	| 'in-memory-cache-miss'
+	| 'fs-cache-hit'
+	| 'fs-cache-miss'
+	| 'loaded-data-size'
+	| 'stored-data-size'
+	| 'loaded-compressed-size'
+	| 'stored-compressed-size';
 
 const metricState: Record<string, number> = {};
 
 function makeTracker(name: Metrics): (n?: number) => void {
-  metricState[name] = 0;
-  return (n = 1) => { metricState[name]! += n; };
+	metricState[name] = 0;
+	return (n = 1) => {
+		metricState[name]! += n;
+	};
 }
 
 export const inMemoryCacheHit = makeTracker('in-memory-cache-hit');
@@ -26,10 +28,10 @@ export const trackStoredCompressedData = makeTracker('stored-compressed-size');
 
 export type CollectedMetrics = Record<Metrics, number>;
 
-export const collectMetrics = (): CollectedMetrics => ({ ...metricState } as CollectedMetrics);
+export const collectMetrics = (): CollectedMetrics => ({ ...metricState }) as CollectedMetrics;
 
 export const clearMetrics = (): void => {
-  for (const key in metricState) {
-    metricState[key] = 0;
-  }
-}
+	for (const key in metricState) {
+		metricState[key] = 0;
+	}
+};

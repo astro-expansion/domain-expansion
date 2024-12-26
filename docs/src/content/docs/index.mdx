@@ -15,7 +15,7 @@ Here's how Domain Expansion performs against the default Astro build, both in a 
 
 <BenchmarkResults />
 
-You can read more about the benchmarks in the [benchmarks README](https://github.com/astro-expansion/domain-expansion/tree/main/benchmarks) 
+You can read more about the benchmarks in the [benchmarks README](https://github.com/astro-expansion/domain-expansion/tree/main/benchmarks)
 on our GitHub repository.
 
 Basically - the bigger the site, the more you'll see Domain Expansion shine. You can read more about the
@@ -26,21 +26,9 @@ trade-offs on the [caveats page](/caveats).
 The Domain Expansion integration can be installed from npm using the following command:
 
 <Tabs>
-	<TabItem label="npm">
-		```bash
-		npx astro add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="pnpm">
-		```bash
-		pnpm astro add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="yarn">
-		```bash
-		yarn astro add @domain-expansion/astro
-		```
-	</TabItem>
+	<TabItem label="npm">```bash npx astro add @domain-expansion/astro ```</TabItem>
+	<TabItem label="pnpm">```bash pnpm astro add @domain-expansion/astro ```</TabItem>
+	<TabItem label="yarn">```bash yarn astro add @domain-expansion/astro ```</TabItem>
 </Tabs>
 
 This will install the integration and add it to your `astro.config.mjs`.
@@ -50,33 +38,19 @@ This will install the integration and add it to your `astro.config.mjs`.
 Install the `@domain-expansion/astro` package using your package manager of choice:
 
 <Tabs>
-	<TabItem label="npm">
-		```bash
-		npm i @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="pnpm">
-		```bash
-		pnpm add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="yarn">
-		```bash
-		yarn add @domain-expansion/astro
-		```
-	</TabItem>
+	<TabItem label="npm">```bash npm i @domain-expansion/astro ```</TabItem>
+	<TabItem label="pnpm">```bash pnpm add @domain-expansion/astro ```</TabItem>
+	<TabItem label="yarn">```bash yarn add @domain-expansion/astro ```</TabItem>
 </Tabs>
 
 Import and use the integration in your `astro.config.mjs`:
 
 ```js
 import { defineConfig } from 'astro/config';
-import domainExpansion from "@domain-expansion/astro";
+import domainExpansion from '@domain-expansion/astro';
 
 export default defineConfig({
-	integrations: [
-		domainExpansion(),
-	],
+	integrations: [domainExpansion()],
 });
 ```
 

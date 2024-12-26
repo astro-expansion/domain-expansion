@@ -21,11 +21,14 @@ const benchmarkSchema = z.object({
 				mean: z.number(),
 				stdDev: z.number(),
 			}),
-		})
-	})
+		}),
+	}),
 });
 
 export const collections = {
 	docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),
-	benchmark: defineCollection({ loader: file("src/content/benchmark/results.json"), schema: benchmarkSchema }),
+	benchmark: defineCollection({
+		loader: file('src/content/benchmark/results.json'),
+		schema: benchmarkSchema,
+	}),
 };
