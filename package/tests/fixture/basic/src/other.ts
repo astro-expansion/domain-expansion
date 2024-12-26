@@ -1,1 +1,1 @@
-export const other = "updated transitive value";
+export const other = "anonther transitive value";
