@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.9
+
+### Patch Changes
+
+- Fix env var name
+
 ## 0.1.0-beta.8
 
 ### Minor Changes

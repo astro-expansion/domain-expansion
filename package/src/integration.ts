@@ -55,7 +55,7 @@ export const integration = defineIntegration({
 				.default(getDefaultCacheComponents()),
 			componentsHaveSharedState: z
 				.boolean()
-				.default(process.env.DOMAIN_EXPANSION_STATEFULL_COMPONENTS === 'true'),
+				.default(process.env.DOMAIN_EXPANSION_STATEFUL_COMPONENTS === 'true'),
 			cachePages: z
 				.boolean()
 				.default((process.env.DOMAIN_EXPANSION_CACHE_PAGES || 'true') === 'true'),
