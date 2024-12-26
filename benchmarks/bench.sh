@@ -292,6 +292,36 @@ fi
 # Cleanup
 ###############################
 
+cd "$temp_dir"
+
+# Calculate all folder sizes and print
+
+echo -e "\n${F_BOLD}${C_MEDIUMPURPLE1}[Cache Size Summary]${NO_FORMAT}"
+
+if ! is_excluded "zen-browser"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}zen-browser/www${NO_FORMAT}: $(du -sh zen-browser/node_modules/.domain-expansion | cut -f1)"
+fi
+
+if ! is_excluded "studiocms-ui"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}withstudiocms/ui${NO_FORMAT}: $(du -sh ui/docs/node_modules/.domain-expansion | cut -f1)"
+fi
+
+if ! is_excluded "brutal"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}eliancodes/brutal${NO_FORMAT}: $(du -sh brutal/node_modules/.domain-expansion | cut -f1)"
+fi
+
+if ! is_excluded "starlight"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}withastro/starlight${NO_FORMAT}: $(du -sh starlight/docs/node_modules/.domain-expansion | cut -f1)"
+fi
+
+if ! is_excluded "astro.build"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}withastro/astro.build${NO_FORMAT}: $(du -sh astro.build/node_modules/.domain-expansion | cut -f1)"
+fi
+
+if ! is_excluded "astro-docs"; then 
+  echo -e "${F_BOLD}${C_STEELBLUE1}withastro/docs${NO_FORMAT}: $(du -sh docs/node_modules/.domain-expansion | cut -f1)"
+fi
+
 cd "$ROOT"
 
 rm -rf "$temp_dir"
