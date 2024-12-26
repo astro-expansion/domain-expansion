@@ -35,7 +35,7 @@
           "stdDev": 2.398
         },
         "hot": {
-          "mean": 30.660,
+          "mean": 30.66,
           "stdDev": 1.442
         }
       }
@@ -49,7 +49,7 @@
       "means": {
         "standard": {
           "mean": 34.021,
-          "stdDev": 2.990
+          "stdDev": 2.99
         },
         "cold": {
           "mean": 35.049,
@@ -94,11 +94,11 @@
           "stdDev": 0.631
         },
         "cold": {
-          "mean": 17.880,
+          "mean": 17.88,
           "stdDev": 0.603
         },
         "hot": {
-          "mean": 17.490,
+          "mean": 17.49,
           "stdDev": 0.469
         }
       }
