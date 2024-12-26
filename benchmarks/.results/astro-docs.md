@@ -1,5 +1,5 @@
 | Command | Mean [s] | Min [s] | Max [s] | Relative |
 |:---|---:|---:|---:|---:|
-| `[Astro Docs] Normal Build` | 263.283 ± 13.774 | 251.574 | 278.459 | 1.84 ± 0.11 |
-| `[Astro Docs] Domain Expansion (cold build)` | 272.885 ± 15.867 | 256.185 | 287.762 | 1.91 ± 0.12 |
-| `[Astro Docs] Domain Expansion (hot build)` | 143.194 ± 4.299 | 139.882 | 148.052 | 1.00 |
+| `[Astro Docs] Normal Build` | 240.690 ± 38.641 | 205.863 | 282.259 | 1.61 ± 0.27 |
+| `[Astro Docs] Domain Expansion (cold build)` | 266.569 ± 10.783 | 256.842 | 278.163 | 1.78 ± 0.12 |
+| `[Astro Docs] Domain Expansion (hot build)` | 149.427 ± 7.738 | 140.918 | 156.041 | 1.00 |

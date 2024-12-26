@@ -315,7 +315,7 @@ if ! is_excluded "starlight"; then
 fi
 
 if ! is_excluded "astro.build"; then 
-  echo -e "${F_BOLD}${C_STEELBLUE1}withastro/astro.build${NO_FORMAT}: $(du -sh astro.build/node_modules/.domain-expansion | cut -f1)"
+  echo -e "${F_BOLD}${C_STEELBLUE1}withastro/astro.build${NO_FORMAT}: $(du -sh 'astro.build/node_modules/.domain-expansion' | cut -f1)"
 fi
 
 if ! is_excluded "astro-docs"; then 
