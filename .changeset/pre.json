@@ -4,12 +4,14 @@
   "initialVersions": {
     "docs": "0.0.1",
     "@domain-expansion/astro": "0.0.0",
-    "playground": "0.0.1"
+    "playground": "0.0.1",
+    "@domain-expansion-test/basic": "0.0.0"
   },
   "changesets": [
     "angry-ties-poke",
     "fresh-walls-repeat",
     "healthy-bobcats-allow",
+    "mean-experts-pretend",
     "nice-crabs-smash",
     "selfish-laws-protect",
     "sharp-lemons-drop",
