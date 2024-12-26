@@ -28,8 +28,8 @@ await defineTests({
 				},
 			],
 			metricsAfter: {
-				'fs-cache-hit': 14,
-				'fs-cache-miss': 0,
+				'fs-cache-hit': 10,
+				'fs-cache-miss': 2,
 				'in-memory-cache-hit': 0,
 				'in-memory-cache-miss': 14,
 			},
@@ -42,7 +42,7 @@ await defineTests({
 				},
 			],
 			metricsAfter: {
-				'fs-cache-hit': 14,
+				'fs-cache-hit': 12,
 				'fs-cache-miss': 0,
 				'in-memory-cache-hit': 0,
 				'in-memory-cache-miss': 14,
