@@ -4,7 +4,7 @@ A benchmark using [`hyperfine`](https://github.com/sharkdp/hyperfine?tab=readme-
 
 ## About the results
 
-The current results you find in `.results/` were created on Dec. 22, 2024 on a desktop PC with the following specs:
+The current results you find in `.results/` were created on Dec. 26, 2024 on a desktop PC with the following specs:
 
 ```
 CPU: AMD Ryzen 9 5950X (32) @ 5,05 GHz
