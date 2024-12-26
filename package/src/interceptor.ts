@@ -17,57 +17,51 @@ const debug = rootDebug.extend('interceptor-plugin');
 const MODULE_ID = 'virtual:domain-expansion';
 const RESOLVED_MODULE_ID = '\x00virtual:domain-expansion';
 
-const EXCLUDED_MODULE_IDS: string[] = [
-  RESOLVED_MODULE_ID,
-  '\0astro:content',
-  '\0astro:assets',
-];
+const EXCLUDED_MODULE_IDS: string[] = [RESOLVED_MODULE_ID, '\0astro:content', '\0astro:assets'];
 
 type ParseNode = ETreeNode & AstNode;
 
 export const interceptorPlugin = (options: {
-  cacheComponents: false | 'in-memory' | 'persistent',
-  cachePages: boolean,
-  componentsHaveSharedState: boolean,
-  routeEntrypoints: string[],
-  cachePrefix: string,
-}): { plugin: Plugin, cleanup: () => Promise<void> } => {
-  const componentHashes = new Map<string, string>();
+	cacheComponents: false | 'in-memory' | 'persistent';
+	cachePages: boolean;
+	componentsHaveSharedState: boolean;
+	routeEntrypoints: string[];
+	cachePrefix: string;
+}): { plugin: Plugin; cleanup: () => Promise<void> } => {
+	const componentHashes = new Map<string, string>();
 
-  let cache: Cache;
+	let cache: Cache;
 
-  const plugin: Plugin = {
-    name: '@domain-expansion/interceptor',
-    enforce: 'post',
-    async configResolved(config) {
-      const { resolve: resolver } = createResolver(config.root);
+	const plugin: Plugin = {
+		name: '@domain-expansion/interceptor',
+		enforce: 'post',
+		async configResolved(config) {
+			const { resolve: resolver } = createResolver(config.root);
 
-      cache = new Cache(
-        resolver(`node_modules/.domain-expansion/${options.cachePrefix}`),
-      );
+			cache = new Cache(resolver(`node_modules/.domain-expansion/${options.cachePrefix}`));
 
-      await cache.initialize();
+			await cache.initialize();
 
-      setCachingOptions({
-        ...options,
-        cache,
-        root: config.root,
-        routeEntrypoints: options.routeEntrypoints.map(entrypoint => resolver(entrypoint)),
-        componentHashes,
-      });
-    },
-    resolveId(id) {
-      if (id === MODULE_ID) return RESOLVED_MODULE_ID;
+			setCachingOptions({
+				...options,
+				cache,
+				root: config.root,
+				routeEntrypoints: options.routeEntrypoints.map((entrypoint) => resolver(entrypoint)),
+				componentHashes,
+			});
+		},
+		resolveId(id) {
+			if (id === MODULE_ID) return RESOLVED_MODULE_ID;
 
-      return null;
-    },
-    load(id, { ssr } = {}) {
-      if (id !== RESOLVED_MODULE_ID) return;
-      if (!ssr) throw new AstroError("Client domain can't be expanded.");
+			return null;
+		},
+		load(id, { ssr } = {}) {
+			if (id !== RESOLVED_MODULE_ID) return;
+			if (!ssr) throw new AstroError("Client domain can't be expanded.");
 
-      // Return unchanged functions when not in a shared context with the build pipeline
-      // AKA. During server rendering
-      const code = `
+			// Return unchanged functions when not in a shared context with the build pipeline
+			// AKA. During server rendering
+			const code = `
 import { HTMLBytes, HTMLString } from "astro/runtime/server/index.js";
 import { SlotString } from "astro/runtime/server/render/slot.js";
 import { createHeadAndContent, isHeadAndContent } from "astro/runtime/server/render/astro/head-and-content.js";
@@ -95,181 +89,198 @@ const ccRenderTrackingSym = Symbol.for('@domain-expansion:astro-cc-render-tracki
 export const domainExpansionRenderEntry = globalThis[ccRenderTrackingSym] ?? ((fn) => fn);
 `;
 
-      if (process.env.TEST) return code + `domainExpansionAssets(${JSON.stringify(randomBytes(8).toString('hex'))});`;
+			if (process.env.TEST)
+				return code + `domainExpansionAssets(${JSON.stringify(randomBytes(8).toString('hex'))});`;
 
-      return code;
-    },
-    async transform(code, id, { ssr } = {}) {
-      if (!ssr) return;
+			return code;
+		},
+		async transform(code, id, { ssr } = {}) {
+			if (!ssr) return;
 
-      const transformers: Transformer[] = [
-        createComponentTransformer,
-        getImageAssetTransformer,
-        renderCCEntryTransformer,
-      ];
+			const transformers: Transformer[] = [
+				createComponentTransformer,
+				getImageAssetTransformer,
+				renderCCEntryTransformer,
+			];
 
-      for (const transformer of transformers) {
-        const result = transformer(this, code, id);
-        if (result) return result;
-      }
+			for (const transformer of transformers) {
+				const result = transformer(this, code, id);
+				if (result) return result;
+			}
 
-      return;
-    },
-    async generateBundle() {
-      for (const rootName of this.getModuleIds()) {
-        if (!rootName.endsWith('.astro')) continue;
+			return;
+		},
+		async generateBundle() {
+			for (const rootName of this.getModuleIds()) {
+				if (!rootName.endsWith('.astro')) continue;
 
-        const processedImports: string[] = [];
-        const hashParts: string[] = [];
-        const importQueue = [rootName];
+				const processedImports: string[] = [];
+				const hashParts: string[] = [];
+				const importQueue = [rootName];
 
-        while (importQueue.length) {
-          const modName = importQueue.pop()!;
-          const modInfo = this.getModuleInfo(modName)!;
-          if (modInfo.isExternal || !modInfo.code) continue;
+				while (importQueue.length) {
+					const modName = importQueue.pop()!;
+					const modInfo = this.getModuleInfo(modName)!;
+					if (modInfo.isExternal || !modInfo.code) continue;
 
-          processedImports.push(modName);
-          hashParts.push(modInfo.code);
-          importQueue.push(...modInfo.importedIdResolutions
-            .map(resolution => resolution.id)
-            .filter(
-              importId => (
-                !importId.endsWith('.astro')
-                && !EXCLUDED_MODULE_IDS.includes(importId)
-                && !processedImports.includes(importId)
-              )
-            ));
-        }
+					processedImports.push(modName);
+					hashParts.push(modInfo.code);
+					importQueue.push(
+						...modInfo.importedIdResolutions
+							.map((resolution) => resolution.id)
+							.filter(
+								(importId) =>
+									!importId.endsWith('.astro') &&
+									!EXCLUDED_MODULE_IDS.includes(importId) &&
+									!processedImports.includes(importId)
+							)
+					);
+				}
 
-        componentHashes.set(rootName, hash_sum(hashParts));
-      }
-    },
-  };
+				componentHashes.set(rootName, hash_sum(hashParts));
+			}
+		},
+	};
 
-  return {
-    plugin,
-    cleanup: () => cache.flush(),
-  };
-}
+	return {
+		plugin,
+		cleanup: () => cache.flush(),
+	};
+};
 
-type Transformer = (ctx: TransformPluginContext, code: string, id: string) => TransformResult | null;
+type Transformer = (
+	ctx: TransformPluginContext,
+	code: string,
+	id: string
+) => TransformResult | null;
 
 type TransformResult = {
-  code: string,
-  map: SourceMap,
-}
+	code: string;
+	map: SourceMap;
+};
 
 const createComponentTransformer: Transformer = (ctx, code, id) => {
-  if (!code.includes('function createComponent(')) return null;
+	if (!code.includes('function createComponent(')) return null;
 
-  if (!/node_modules\/astro\/dist\/runtime\/[\w\/.-]+\.js/.test(id)) {
-    debug('"createComponent" declaration outside of expected module', { id });
-    return null;
-  }
+	if (!/node_modules\/astro\/dist\/runtime\/[\w\/.-]+\.js/.test(id)) {
+		debug('"createComponent" declaration outside of expected module', { id });
+		return null;
+	}
 
-  const ms = new MagicString(code);
-  const ast = ctx.parse(code);
+	const ms = new MagicString(code);
+	const ast = ctx.parse(code);
 
-  walk(ast, {
-    leave(estreeNode, parent) {
-      const node = estreeNode as ParseNode;
-      if (node.type !== 'FunctionDeclaration') return;
-      if (node.id.name !== 'createComponent') return;
-      if (parent?.type !== 'Program') {
-        throw new Error('Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.');
-      }
+	walk(ast, {
+		leave(estreeNode, parent) {
+			const node = estreeNode as ParseNode;
+			if (node.type !== 'FunctionDeclaration') return;
+			if (node.id.name !== 'createComponent') return;
+			if (parent?.type !== 'Program') {
+				throw new Error(
+					'Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.'
+				);
+			}
 
-      ms.prependLeft(node.start, [
-        `import {domainExpansionComponents as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};`,
-        'const createComponent = $$domainExpansion(',
-      ].join('\n'));
-      ms.appendRight(node.end, ');');
-    }
-  });
+			ms.prependLeft(
+				node.start,
+				[
+					`import {domainExpansionComponents as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};`,
+					'const createComponent = $$domainExpansion(',
+				].join('\n')
+			);
+			ms.appendRight(node.end, ');');
+		},
+	});
 
-  return {
-    code: ms.toString(),
-    map: ms.generateMap(),
-  };
-}
+	return {
+		code: ms.toString(),
+		map: ms.generateMap(),
+	};
+};
 
 const getImageAssetTransformer: Transformer = (ctx, code, id) => {
-  if (id !== '\0astro:assets') return null;
+	if (id !== '\0astro:assets') return null;
 
-  const ms = new MagicString(code);
-  const ast = ctx.parse(code);
+	const ms = new MagicString(code);
+	const ast = ctx.parse(code);
 
-  const path: ParseNode[] = [];
+	const path: ParseNode[] = [];
 
-  walk(ast, {
-    enter(estreeNode) {
-      const node = estreeNode as ParseNode;
-      path.push(node);
-      if (
-        node.type !== 'VariableDeclarator'
-        || node.id.type !== 'Identifier'
-        || node.id.name !== 'getImage'
-      ) return;
-      const exportDeclaration = path.at(-3);
-      assert.ok(isParseNode(node.init));
-      assert.ok(
-        exportDeclaration?.type === 'ExportNamedDeclaration',
-        'Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.',
-      );
+	walk(ast, {
+		enter(estreeNode) {
+			const node = estreeNode as ParseNode;
+			path.push(node);
+			if (
+				node.type !== 'VariableDeclarator' ||
+				node.id.type !== 'Identifier' ||
+				node.id.name !== 'getImage'
+			)
+				return;
+			const exportDeclaration = path.at(-3);
+			assert.ok(isParseNode(node.init));
+			assert.ok(
+				exportDeclaration?.type === 'ExportNamedDeclaration',
+				'Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.'
+			);
 
-      ms.prependLeft(
-        exportDeclaration.start,
-        `import {domainExpansionAssets as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};\n`,
-      );
-      ms.prependLeft(node.init.start, '$$domainExpansion(');
-      ms.appendRight(node.init.end, ')');
-    },
-    leave(estreeNode) {
-      const lastNode = path.pop();
-      assert.ok(Object.is(lastNode, estreeNode), 'Stack tracking broke');
-    },
-  });
+			ms.prependLeft(
+				exportDeclaration.start,
+				`import {domainExpansionAssets as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};\n`
+			);
+			ms.prependLeft(node.init.start, '$$domainExpansion(');
+			ms.appendRight(node.init.end, ')');
+		},
+		leave(estreeNode) {
+			const lastNode = path.pop();
+			assert.ok(Object.is(lastNode, estreeNode), 'Stack tracking broke');
+		},
+	});
 
-  return {
-    code: ms.toString(),
-    map: ms.generateMap(),
-  };
-}
+	return {
+		code: ms.toString(),
+		map: ms.generateMap(),
+	};
+};
 
 const renderCCEntryTransformer: Transformer = (ctx, code, id) => {
-  if (!code.includes('function renderEntry(')) return null;
+	if (!code.includes('function renderEntry(')) return null;
 
-  if (!/node_modules\/astro\/dist\/content\/[\w\/.-]+\.js/.test(id)) {
-    debug('"renderEntry" declaration outside of expected module', { id });
-    return null;
-  }
+	if (!/node_modules\/astro\/dist\/content\/[\w\/.-]+\.js/.test(id)) {
+		debug('"renderEntry" declaration outside of expected module', { id });
+		return null;
+	}
 
-  const ms = new MagicString(code);
-  const ast = ctx.parse(code);
+	const ms = new MagicString(code);
+	const ast = ctx.parse(code);
 
-  walk(ast, {
-    enter(estreeNode, parent) {
-      const node = estreeNode as ParseNode;
-      if (node.type !== 'FunctionDeclaration') return;
-      if (node.id.name !== 'renderEntry') return;
-      if (parent?.type !== 'Program') {
-        throw new Error('Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.');
-      }
+	walk(ast, {
+		enter(estreeNode, parent) {
+			const node = estreeNode as ParseNode;
+			if (node.type !== 'FunctionDeclaration') return;
+			if (node.id.name !== 'renderEntry') return;
+			if (parent?.type !== 'Program') {
+				throw new Error(
+					'Astro core has changed its runtime, "@domain-expansion/astro" is not compatible with the currently installed Astro version.'
+				);
+			}
 
-      ms.prependLeft(node.start, [
-        `import {domainExpansionRenderEntry as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};\n`,
-        'const renderEntry = $$domainExpansion(',
-      ].join('\n'));
-      ms.appendRight(node.end, ');');
-    },
-  });
+			ms.prependLeft(
+				node.start,
+				[
+					`import {domainExpansionRenderEntry as $$domainExpansion} from ${JSON.stringify(MODULE_ID)};\n`,
+					'const renderEntry = $$domainExpansion(',
+				].join('\n')
+			);
+			ms.appendRight(node.end, ');');
+		},
+	});
 
-  return {
-    code: ms.toString(),
-    map: ms.generateMap(),
-  };
-}
+	return {
+		code: ms.toString(),
+		map: ms.generateMap(),
+	};
+};
 
 function isParseNode(node?: ETreeNode | null): node is ParseNode {
-  return node != null && 'start' in node && typeof node.start === 'number';
+	return node != null && 'start' in node && typeof node.start === 'number';
 }

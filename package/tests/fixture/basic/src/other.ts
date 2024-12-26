@@ -1,1 +1,1 @@
-export const other = "anonther transitive value";
+export const other = 'anonther transitive value';

@@ -1,12 +1,10 @@
 {
-	"extends": "astro/tsconfigs/strictest",
-	"compilerOptions": {
-		"module": "Node16",
-		"moduleResolution": "Node16",
-		"verbatimModuleSyntax": true,
-		"jsx": "preserve"
-	},
-	"exclude": [
-		"dist"
-	]
+  "extends": "astro/tsconfigs/strictest",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "verbatimModuleSyntax": true,
+    "jsx": "preserve"
+  },
+  "exclude": ["dist"]
 }

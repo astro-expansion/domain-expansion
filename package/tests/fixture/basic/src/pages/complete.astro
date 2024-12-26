@@ -1,18 +1,18 @@
 ---
 import Comp from '../Component.astro';
-import {value} from '../module.js';
+import { value } from '../module.js';
 ---
 
 <html>
-  <head>
-    <title>Complete page</title>
-  </head>
-  <body>
-    <Comp value="one" />
-    <p>{value}</p>
-    <Comp value="two" />
-    <Comp>
-      <p>three</p>
-    </Comp>
-  </body>
+	<head>
+		<title>Complete page</title>
+	</head>
+	<body>
+		<Comp value="one" />
+		<p>{value}</p>
+		<Comp value="two" />
+		<Comp>
+			<p>three</p>
+		</Comp>
+	</body>
 </html>
