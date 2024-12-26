@@ -276,7 +276,7 @@ if ! is_excluded "astro-docs"; then
 
   hyperfine \
     --export-markdown "$ROOT/.results/astro-docs.md" \
-    --runs 1 \
+    --runs 3 \
     --prepare '' \
     -n '[Astro Docs] Normal Build' \
     'pnpm build' \
