@@ -1,6 +1,6 @@
 import { addIntegration, defineIntegration } from "astro-integration-kit";
 import { interceptorPlugin } from "./interceptor.js";
-import { collectMetrics } from "./metrics.js";
+import { clearMetrics, collectMetrics } from "./metrics.js";
 import chalk from "chalk";
 import humanFormat from "human-format";
 import { z } from "astro/zod";
@@ -25,8 +25,10 @@ function getDefaultCacheComponents(): false | 'in-memory' | 'persistent' {
 	}
 }
 
+export const INTEGRATION_NAME = '@domain-expansion/astro';
+
 export const integration = defineIntegration({
-	name: "@domain-expansion/astro",
+	name: INTEGRATION_NAME,
 	optionsSchema: z.object({
 		/**
 		 * Whether non-page components should be cached.
@@ -38,35 +40,54 @@ export const integration = defineIntegration({
 			.default(getDefaultCacheComponents()),
 		cachePages: z.boolean()
 			.default((process.env.DOMAIN_EXPANSION_CACHE_PAGES || 'true') === 'true'),
+		/**
+		 * Cache prefix used to store independent cache data across multiple runs.
+		 *
+		 * @internal
+		 */
+		cachePrefix: z.string()
+			.optional()
+			.default('')
 	})
 		.default({}),
 	setup({ options }) {
 		const routeEntrypoints: string[] = [];
+		let cleanup: undefined | (() => Promise<void>);
 
 		return {
 			hooks: {
 				'astro:routes:resolved': (params) => {
+					routeEntrypoints.length = 0;
 					routeEntrypoints.push(...params.routes.map(route => route.entrypoint));
 				},
 				'astro:build:setup': ({ updateConfig, target }) => {
 					if (target === 'server') {
+						const interceptor = interceptorPlugin({
+							...options,
+							routeEntrypoints,
+						});
+						cleanup = interceptor.cleanup;
 						updateConfig({
-							plugins: [interceptorPlugin({
-								...options,
-								routeEntrypoints,
-							})],
+							plugins: [interceptor.plugin],
 						});
 					}
 				},
+				'astro:build:done': async () => {
+					await cleanup?.();
+				},
 				'astro:config:setup': (params) => {
 					if (params.command !== 'build') return;
+
+					clearMetrics();
 
 					addIntegration(params, {
 						ensureUnique: true,
 						integration: {
 							name: '@domain-expansion/astro:reporting',
 							hooks: {
-								'astro:build:done': () => {
+								'astro:build:done': ({ logger }) => {
+									if (!['debug', 'info'].includes(logger.options.level)) return;
+
 									const metrics = collectMetrics();
 
 									const fsCacheTotal = metrics['fs-cache-hit'] + metrics['fs-cache-miss'];

@@ -88,4 +88,8 @@ export class MemoryCache<T> {
         this.#cache.delete(key);
       });
   }
+
+  public clear(): void {
+    this.#cache.clear();
+  }
 }

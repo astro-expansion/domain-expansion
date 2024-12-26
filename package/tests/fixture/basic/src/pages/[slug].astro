@@ -1,0 +1,15 @@
+---
+export function getStaticPaths() {
+  return [
+    { params: { slug: "apple" } },
+    { params: { slug: "banana" } },
+  ];
+}
+
+const { slug } = Astro.params;
+---
+
+<div>
+  A dynamic page with simple parameter:
+  <p>{slug}</p>
+</div>

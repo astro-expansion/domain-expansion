@@ -10,8 +10,6 @@ import type { PersistedMetadata } from "./renderFileStore.js";
 import { isDeepStrictEqual, types } from "node:util";
 import { computeEntryHash, getCurrentContext, makeContextTracking } from "./contextTracking.js";
 
-type CacheRenderingFn = (originalFn: typeof Runtime.createComponent) => typeof Runtime.createComponent;
-
 const debug = rootDebug.extend('render-caching');
 
 const ASSET_SERVICE_CALLS = Symbol('@domain-expansion:astro-assets-service-calls');
@@ -20,16 +18,22 @@ interface ExtendedSSRResult extends SSRResult {
   [ASSET_SERVICE_CALLS]: PersistedMetadata['assetServiceCalls'];
 }
 
-export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cacheOptions }: {
+let cachingOptions: {
   cache: Cache,
   root: string,
   routeEntrypoints: string[],
   componentHashes: Map<string, string>,
   cacheComponents: false | 'in-memory' | 'persistent',
   cachePages: boolean,
-}): CacheRenderingFn => (originalFn) => {
-  debug('Render caching called with:', { routeEntrypoints });
+};
 
+export function setCachingOptions(options: typeof cachingOptions) {
+  cachingOptions = options;
+}
+
+(globalThis as any)[Symbol.for('@domain-expansion:astro-component-caching')] = (
+  originalFn: typeof Runtime.createComponent,
+): typeof Runtime.createComponent => {
   return function cachedCreateComponent(factoryOrOptions, moduleId, propagation) {
     const options = typeof factoryOrOptions === 'function'
       ? { factory: factoryOrOptions, moduleId, propagation } as Exclude<typeof factoryOrOptions, Function>
@@ -38,6 +42,8 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
     const context = getCurrentContext();
 
     let cacheScope = options.moduleId || '';
+
+    const { componentHashes } = cachingOptions;
 
     if (!options.moduleId || !componentHashes.has(options.moduleId)) {
       if (!context) return originalFn(options);
@@ -52,7 +58,6 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
       cacheScope = `ccEntry:${ccRenderCall.id}:${ccRenderCall.hash}`;
     } else {
       const hash = componentHashes.get(options.moduleId)!;
-      debug('Creating cached component', { moduleId: options.moduleId, hash })
       cacheScope = hash;
     }
 
@@ -64,14 +69,21 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
+    const { cache, routeEntrypoints, componentHashes, ...cacheOptions } = cachingOptions;
+
     const isEntrypoint = routeEntrypoints.includes(moduleId!);
     const cacheParams: Record<'persist' | 'skipInMemory', boolean> = {
       persist: (
         (isEntrypoint && cacheOptions.cachePages)
         || (!isEntrypoint && cacheOptions.cacheComponents === 'persistent')
       ),
-      skipInMemory: isEntrypoint || cacheOptions.cacheComponents !== false,
+      skipInMemory: isEntrypoint || cacheOptions.cacheComponents === false,
     };
+
+    debug('Creating cached component', {
+      cacheScope, moduleId,
+      isEntrypoint, cacheParams,
+    });
 
     return async (result: ExtendedSSRResult, props, slots) => {
       const context = getCurrentContext();
@@ -90,10 +102,12 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
       }
 
       // TODO: Handle edge-cases involving Object.defineProperty
-      const resolvedProps = Object.fromEntries((await Promise.all(
-        Object.entries(props)
-          .map(async ([key, value]) => [key, types.isProxy(value) ? undefined : await value])
-      )).filter((_key, value) => !!value));
+      const resolvedProps = Object.fromEntries(
+        (await Promise.all(
+          Object.entries(props)
+            .map(async ([key, value]) => [key, types.isProxy(value) ? undefined : await value])
+        ))
+          .filter(([_key, value]) => !!value));
 
       // We need to delete this because otherwise scopes from outside of a component can be globally
       // restricted to the inside of a child component through a slot and to support that the component
@@ -109,7 +123,11 @@ export const makeCaching = ({ cache, routeEntrypoints, componentHashes, ...cache
 
       const url = new URL(result.request.url);
 
-      const hash = hashSum([result.compressHTML, result.params, url.pathname, url.search, resolvedProps]);
+      const hash = hashSum(
+        isEntrypoint
+          ? [result.compressHTML, result.params, url.pathname, url.search, resolvedProps]
+          : [result.compressHTML, resolvedProps]
+      );
       const cacheKey = `${cacheScope}:${hash}`;
 
       const { runIn: enterTrackingScope, collect: collectTracking } = makeContextTracking();

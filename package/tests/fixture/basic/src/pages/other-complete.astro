@@ -1,0 +1,18 @@
+---
+import Comp from '../Component.astro';
+import {other} from '../other.js';
+---
+
+<html>
+  <head>
+    <title>Another complete page</title>
+  </head>
+  <body>
+    <Comp value="one" />
+    <p>{other}</p>
+    <Comp value="two" />
+    <Comp>
+      <p>three</p>
+    </Comp>
+  </body>
+</html>

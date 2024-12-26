@@ -1,0 +1,1 @@
+export const other = "updated transitive value";

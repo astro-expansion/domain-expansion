@@ -13,6 +13,7 @@ import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, tr
 import type { ContextTracking } from "./contextTracking.js";
 import { MemoryCache } from "./inMemoryLRU.js";
 import murmurHash from "murmurhash-native";
+import { FactoryValueClone } from "./factoryValueClone.ts";
 
 const
   gzip = promisify(zlib.gzip),
@@ -87,10 +88,17 @@ const debug = rootDebug.extend('file-store');
 
 type ValueThunk = Thunk<AstroFactoryReturnValue>;
 
+type DenormalizationResult<D, N> = {
+  denormalized?: D,
+  clone: Thunk<N>,
+};
+
 export class RenderFileStore {
   private readonly gzippedCache = new MemoryCache<Buffer>(Number.POSITIVE_INFINITY);
 
   private readonly resolver: ReturnType<typeof createResolver>['resolve'];
+
+  private readonly pending: Array<Promise<void>> = [];
 
   private knownFiles!: string[];
 
@@ -99,7 +107,7 @@ export class RenderFileStore {
     fs.mkdirSync(this.cacheDir, { recursive: true });
   }
 
-  public async initialize() {
+  public async initialize(): Promise<void> {
     if (fs.existsSync(this.cacheDir)) {
       this.knownFiles = await fs.promises.readdir(this.cacheDir, {
         recursive: true,
@@ -115,6 +123,15 @@ export class RenderFileStore {
         this.gzippedCache.storeSync(hash, stored);
       } catch { }
     }))
+  }
+
+  public async flush(): Promise<void> {
+    while (this.pending.length) {
+      await Promise.all(this.pending);
+    }
+
+    this.gzippedCache.clear();
+    this.knownFiles = [];
   }
 
   public async saveRenderValue(key: string, value: AstroFactoryReturnValue): Promise<ValueThunk> {
@@ -134,6 +151,7 @@ export class RenderFileStore {
 
       if (!serializedValue) {
         debug('Renderer cache miss', key);
+        fsCacheMiss();
         return null;
       }
 
@@ -169,6 +187,7 @@ export class RenderFileStore {
       const serializedValue: SerializedMetadata | null = await this.load(key + ':metadata');
       if (!serializedValue) {
         debug('Metadata cache miss', key);
+        fsCacheMiss();
         return null;
       }
 
@@ -192,23 +211,30 @@ export class RenderFileStore {
   }
 
   public store(cacheKey: string, data: any): void {
-    setTimeout(async () => {
-      try {
-        const serializedData = Buffer.isBuffer(data) ? data : Buffer.from(JSON.stringify(data), 'utf-8');
-        trackStoredData(serializedData.byteLength);
-        const compressedData = await gzip(serializedData, { level: 9 });
-        trackStoredCompressedData(compressedData.byteLength);
+    const promise = new Promise<void>(resolve => {
+      setTimeout(async () => {
+        try {
+          const serializedData = Buffer.isBuffer(data) ? data : Buffer.from(JSON.stringify(data), 'utf-8');
+          trackStoredData(serializedData.byteLength);
+          const compressedData = await gzip(serializedData, { level: 9 });
+          trackStoredCompressedData(compressedData.byteLength);
 
-        const hash = murmurHash.murmurHash64(cacheKey);
-        this.gzippedCache.storeSync(hash, compressedData);
-        await fs.promises.writeFile(
-          this.resolver(hash),
-          compressedData,
-        );
-      } catch (err) {
-        debug('Failed to persist data', err);
-      }
+          const hash = murmurHash.murmurHash64(cacheKey);
+          this.gzippedCache.storeSync(hash, compressedData);
+          await fs.promises.writeFile(
+            this.resolver(hash),
+            compressedData,
+          );
+        } catch (err) {
+          debug('Failed to persist data', err);
+        } finally {
+          resolve();
+          this.pending.splice(this.pending.indexOf(promise), 1);
+        }
+      });
     });
+
+    this.pending.push(promise);
   }
 
   public async load(cacheKey: string, parse = true): Promise<any> {
@@ -226,21 +252,19 @@ export class RenderFileStore {
     return parse ? JSON.parse(uncompressedData.toString('utf-8')) : uncompressedData;
   }
 
-  public static async denormalizeValue(value: AstroFactoryReturnValue): Promise<{ denormalized?: SerializedValue, clone: ValueThunk }> {
+  public static async denormalizeValue(
+    value: AstroFactoryReturnValue
+  ): Promise<DenormalizationResult<SerializedValue, AstroFactoryReturnValue>> {
     if (value instanceof Response) {
-      const denormalized = await RenderFileStore.denormalizeResponse(value);
-      return {
-        denormalized,
-        clone: () => RenderFileStore.normalizeResponse(denormalized),
-      };
+      return RenderFileStore.denormalizeResponse(value);
     }
 
     if (runtime.isHeadAndContent(value)) {
-      const chunks = await RenderFileStore.renderTemplateToChunks(value.content);
+      const chunks = await FactoryValueClone.renderTemplateToChunks(value.content);
       const seminormalChunks = await Promise.all(chunks.map(RenderFileStore.tryDenormalizeChunk));
       const clone = () => runtime.createHeadAndContent(
         value.head,
-        RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks),
+        FactoryValueClone.renderTemplateFromChunks(chunks),
       );
 
       return seminormalChunks.every(Either.isRight)
@@ -255,9 +279,9 @@ export class RenderFileStore {
         : { clone };
     }
 
-    const chunks = await RenderFileStore.renderTemplateToChunks(value);
+    const chunks = await FactoryValueClone.renderTemplateToChunks(value);
     const seminormalChunks = await Promise.all(chunks.map(RenderFileStore.tryDenormalizeChunk));
-    const clone = () => RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks);
+    const clone = () => FactoryValueClone.renderTemplateFromChunks(chunks);
 
     return seminormalChunks.every(Either.isRight)
       ? {
@@ -361,8 +385,12 @@ export class RenderFileStore {
      */
 
     switch (chunk.type) {
-      case "primitive":
+      case "primitive": {
+        if (chunk.value === undefined) {
+          throw new Error("Undefined chunk value");
+        }
         return chunk.value as string;
+      }
       case "htmlString":
         return new runtime.HTMLString(chunk.value);
       case "htmlBytes":
@@ -387,6 +415,8 @@ export class RenderFileStore {
         return new Response(chunk.body, {
           headers: chunk.headers
         });
+      default:
+        throw new Error(`Unknown chunk type: ${(chunk as any).type}`);
     }
   }
 
@@ -398,14 +428,23 @@ export class RenderFileStore {
     return runtime.createRenderInstruction(instruction as any);
   }
 
-  private static async denormalizeResponse(value: Response): Promise<SerializedValue<'response'> & SerializedChunk<'response'>> {
+  private static async denormalizeResponse(
+    value: Response
+  ): Promise<DenormalizationResult<
+    SerializedValue<'response'> & SerializedChunk<'response'>,
+    Response
+  >> {
+    const body = await value.arrayBuffer();
     return {
-      type: 'response',
-      body: Buffer.from(await value.arrayBuffer()).toString('base64'),
-      status: value.status,
-      statusText: value.statusText,
-      headers: Object.fromEntries(value.headers.entries()),
-    }
+      denormalized: {
+        type: 'response',
+        body: Buffer.from(body).toString('base64'),
+        status: value.status,
+        statusText: value.statusText,
+        headers: Object.fromEntries(value.headers.entries()),
+      },
+      clone: () => new Response(body, value),
+    };
   }
 
   private static normalizeResponse(value: SerializedValue<'response'> | SerializedChunk<'response'>): Response {
@@ -414,20 +453,6 @@ export class RenderFileStore {
       status: value.status,
       statusText: value.statusText,
     });
-  }
-
-  private static async renderTemplateToChunks(value: RenderTemplateResult): Promise<RenderDestinationChunk[]> {
-    const chunks: RenderDestinationChunk[] = [];
-
-    const cachedDestination: RenderDestination = {
-      write(chunk) {
-        chunks.push(chunk);
-      },
-    };
-
-    await value.render(cachedDestination);
-
-    return chunks;
   }
 
   private static renderTemplateFromSeminormalizedChunks(chunks: Either<RenderDestinationChunk, SerializedChunk>[]): RenderTemplateResult {

@@ -4,6 +4,7 @@ import { type MaybePromise, type Thunk } from "./utils.js";
 import { type PersistedMetadata, RenderFileStore } from "./renderFileStore.js";
 import { inMemoryCacheHit, inMemoryCacheMiss } from "./metrics.js";
 import { MemoryCache } from "./inMemoryLRU.js";
+import { FactoryValueClone } from "./factoryValueClone.ts";
 
 const debug = rootDebug.extend('cache');
 
@@ -26,6 +27,17 @@ export class Cache {
     return this.persisted.initialize();
   }
 
+  public async flush(): Promise<void> {
+    await this.persisted.flush();
+
+    this.valueCache.clear();
+    this.metadataCache.clear();
+
+    const self = this as any;
+    delete self.valueCache;
+    delete self.metadataCache;
+  }
+
   public saveRenderValue({ key, factoryValue, ...options }: {
     key: string,
     factoryValue: AstroFactoryReturnValue,
@@ -34,7 +46,7 @@ export class Cache {
   }): Promise<ValueThunk> {
     const promise = options.persist
       ? this.persisted.saveRenderValue(key, factoryValue)
-      : RenderFileStore.denormalizeValue(factoryValue).then(result => result.clone);
+      : FactoryValueClone.makeResultClone(factoryValue);
     if (!options.skipInMemory) this.valueCache.storeLoading(key, promise);
     return promise;
   }
