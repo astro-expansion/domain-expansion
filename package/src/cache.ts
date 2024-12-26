@@ -1,244 +1,139 @@
-import type { RenderDestination, RenderDestinationChunk, RenderInstance as BaseRender } from "astro/runtime/server/render/common.js";
-import { rootDebug } from "./debug.ts";
-import { RenderFileStore } from "./renderFileStore.ts";
-import { ReadableStream } from 'node:stream/web';
-import { HTMLBytes, HTMLString } from "astro/runtime/server/escape.js";
+import type { AstroFactoryReturnValue } from 'astro/runtime/server/render/astro/factory.js';
+import { rootDebug } from './debug.js';
+import { type MaybePromise, type Thunk } from './utils.js';
+import { type PersistedMetadata, RenderFileStore } from './renderFileStore.js';
+import { inMemoryCacheHit, inMemoryCacheMiss } from './metrics.js';
+import { MemoryCache } from './inMemoryLRU.js';
+import { FactoryValueClone } from './factoryValueClone.ts';
 
 const debug = rootDebug.extend('cache');
 
-type MaybePromise<T> = Promise<T> | T;
-
-export type RenderInstance = BaseRender & {
-  scope: string;
-}
-
-/**
-  * Polyfill for `Promise.withResolvers`
-  */
-function promiseWithResolvers<T>(): PromiseWithResolvers<T> {
-  let resolve: (res: T | PromiseLike<T>) => void;
-  let reject: (err?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-
-  return { promise, resolve: resolve!, reject: reject! };
-}
+type ValueThunk = Thunk<AstroFactoryReturnValue>;
 
 export class Cache {
-  private readonly inMemory = new Map<string, RenderInstance | null>();
+	private readonly valueCache = new MemoryCache<Thunk<AstroFactoryReturnValue> | null>();
 
-  private readonly loading = new Map<string, Promise<RenderInstance | null>>();
+	private readonly metadataCache = new MemoryCache<PersistedMetadata | null>();
 
-  private readonly persisted: RenderFileStore;
+	private readonly persisted: RenderFileStore;
 
-  public constructor(
-    cacheDir: string,
-  ) {
-    this.persisted = new RenderFileStore(cacheDir);
-  }
+	public constructor(cacheDir: string) {
+		this.persisted = new RenderFileStore(cacheDir);
+	}
 
-  public saveRenderer(key: string, scope: string, renderer: BaseRender): Promise<RenderInstance> {
-    const { promise, resolve, reject } = promiseWithResolvers<RenderInstance>();
-    this.storeLoadingStage(key, promise);
+	public initialize(): Promise<void> {
+		return this.persisted.initialize();
+	}
 
-    Cache.rendererToChunks(renderer).then(chunks => {
-      const cachedRenderer = Cache.rendererFromChunks(scope, chunks);
-      this.persisted.persistRenderer(key, scope, chunks)
-        .catch(e => {
-          debug('Error persisting renderer', e);
-        })
-        .finally(() => {
-          resolve(cachedRenderer);
-        })
-    })
-      .catch(e => {
-        debug('Failed to render to chunks for caching', e);
-        reject(e);
-      });
+	public async flush(): Promise<void> {
+		await this.persisted.flush();
 
-    return promise;
-  }
+		this.valueCache.clear();
+		this.metadataCache.clear();
 
-  public getRenderer(
-    scope: string,
-    loadKey: () => MaybePromise<{
-      key: string
-      loadFresh: () => MaybePromise<BaseRender>,
-    }>,
-  ): RenderInstance {
-    const innerRenderer = Promise.resolve(loadKey())
-      .then(({ key, loadFresh }) => this.getCachedRenderer(key)
-        .then(
-          async renderer => {
-            if (renderer !== null) {
-              debug(`Acquired cached renderer for "${key}"`);
-              return renderer;
-            }
+		const self = this as any;
+		delete self.valueCache;
+		delete self.metadataCache;
+	}
 
-            return this.saveRenderer(key, scope, await loadFresh());
-          }
-        ))
-      .then(renderer => (
-        renderer.scope === scope ? renderer : Cache.replaceStringsInRenderer(
-          renderer,
-          renderer.scope,
-          scope,
-          scope,
-        )
-      ));
+	public saveRenderValue({
+		key,
+		factoryValue,
+		...options
+	}: {
+		key: string;
+		factoryValue: AstroFactoryReturnValue;
+		persist: boolean;
+		skipInMemory: boolean;
+	}): Promise<ValueThunk> {
+		const promise = options.persist
+			? this.persisted.saveRenderValue(key, factoryValue)
+			: FactoryValueClone.makeResultClone(factoryValue);
+		if (!options.skipInMemory) this.valueCache.storeLoading(key, promise);
+		return promise;
+	}
 
-    return {
-      scope,
-      render: async (destination) => {
-        debug("Rendering with lazy renderer");
-        const renderer = await innerRenderer;
+	public async getRenderValue({
+		key,
+		loadFresh,
+		...options
+	}: {
+		key: string;
+		loadFresh: Thunk<MaybePromise<AstroFactoryReturnValue>>;
+		persist: boolean;
+		force: boolean;
+		skipInMemory: boolean;
+	}): Promise<{ cached: boolean; value: ValueThunk }> {
+		const value = await this.getStoredRenderValue(key, options.force, options.skipInMemory);
 
-        return renderer.render(destination);
-      }
-    }
-  }
+		if (value) return { cached: true, value };
 
-  private getCachedRenderer(key: string): Promise<RenderInstance | null> {
-    const fromMemory = this.inMemory.get(key);
-    if (fromMemory !== undefined) {
-      debug(`Retrieve renderer for "${key}" from memory`);
-      return Promise.resolve(fromMemory);
-    }
+		return {
+			cached: false,
+			value: await this.saveRenderValue({
+				...options,
+				key,
+				factoryValue: await loadFresh(),
+			}),
+		};
+	}
 
-    const loading = this.loading.get(key);
-    if (loading !== undefined) {
-      debug(`Retrieve renderer for "${key}" from loading stage`);
-      return loading;
-    }
+	public saveMetadata({
+		key,
+		metadata,
+		persist,
+		skipInMemory,
+	}: {
+		key: string;
+		metadata: PersistedMetadata;
+		persist: boolean;
+		skipInMemory: boolean;
+	}): void {
+		if (!skipInMemory) this.metadataCache.storeSync(key, metadata);
+		if (persist) this.persisted.saveMetadata(key, metadata);
+	}
 
-    // Use a 3-stage cache with a loading stage holding the promises
-    // to avoid duplicate reading from not caching the promise
-    // and memory leaks to only caching the promises.
-    const newPromise = this.persisted.loadRenderer(key)
-      .then((stored) => stored === null ? null : Cache.rendererFromChunks(stored.scope, stored.chunks));
-    this.storeLoadingStage(key, newPromise);
+	public async getMetadata({
+		key,
+		skipInMemory,
+	}: {
+		key: string;
+		skipInMemory: boolean;
+	}): Promise<PersistedMetadata | null> {
+		const fromMemory = this.metadataCache.get(key);
+		if (fromMemory) {
+			debug(`Retrieve metadata for "${key}" from memory`);
+			inMemoryCacheHit();
+			return fromMemory;
+		}
 
-    return newPromise;
-  }
+		inMemoryCacheMiss();
 
-  private storeLoadingStage(key: string, promise: Promise<RenderInstance | null>): void {
-    this.loading.set(key, promise);
-    this.inMemory.delete(key);
-    promise
-      .then(
-        result => {
-          debug(`Storing cached render for "${key}"`);
-          this.inMemory.set(key, result);
-        }
-      )
-      .finally(() => {
-        debug(`Clearing loading state for "${key}"`);
-        this.loading.delete(key);
-      });
-  }
+		const newPromise = this.persisted.loadMetadata(key);
+		if (!skipInMemory) this.metadataCache.storeLoading(key, newPromise);
 
-  private static rendererFromChunks(scope: string, chunks: RenderDestinationChunk[]): RenderInstance {
-    return {
-      scope,
-      render: (destination) => {
-        for (const chunk of chunks) {
-          destination.write(chunk);
-        }
-      }
-    }
-  }
+		return newPromise;
+	}
 
-  public static async rendererToChunks(renderer: BaseRender): Promise<RenderDestinationChunk[]> {
-    const chunks: RenderDestinationChunk[] = [];
+	private getStoredRenderValue(
+		key: string,
+		force: boolean,
+		skipInMemory: boolean
+	): MaybePromise<ValueThunk | null> {
+		const fromMemory = this.valueCache.get(key);
+		if (fromMemory) {
+			debug(`Retrieve renderer for "${key}" from memory`);
+			inMemoryCacheHit();
+			return fromMemory;
+		}
 
-    const cachedDestination: RenderDestination = {
-      write(chunk) {
-        chunks.push(chunk);
-      },
-    };
+		inMemoryCacheMiss();
 
-    await renderer.render(cachedDestination);
+		if (force) return null;
 
-    return chunks;
-  }
+		const newPromise = this.persisted.loadRenderer(key);
+		if (!skipInMemory) this.valueCache.storeLoading(key, newPromise);
 
-  private static replaceStringEverywhere(expression: any, searchValue: string | RegExp, replaceValue: string): any;
-  private static replaceStringEverywhere(expression: any, searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string): any;
-  private static replaceStringEverywhere(
-    expression: any,
-    ...replaceArgs: /* I unga, therefore I bunga */[any, any]
-  ): any {
-    switch (typeof expression) {
-      case "string":
-        return expression.replaceAll(...replaceArgs);
-      case "object": {
-        if (expression instanceof String) {
-          // A chunk can be a subclass of `String` with special meaning to Astro, like `HTMLString`.
-          // When calling `.replaceAll` on a subclass of `String` the result is a plain string without
-          // the custom constructor.
-          // So we need to construct a new instance of the custom subclass after replacing the contents
-          // to keep the semantics.
-          return new (expression.constructor as StringConstructor)(expression.replaceAll(...replaceArgs));
-        }
-
-        if (Cache.isInstanceByName<HTMLBytes>('HTMLBytes', expression)) {
-          return new HTMLString(
-            Buffer.from(expression).toString('utf-8')
-              .replaceAll(...replaceArgs)
-          );
-        }
-
-        if (expression instanceof Response) {
-          return new Response(
-            ReadableStream.from({
-              async*[Symbol.asyncIterator]() {
-                const text = await expression.text();
-
-                yield text.replaceAll(...replaceArgs);
-              }
-            }),
-            expression,
-          )
-        }
-
-        if (expression instanceof Promise) {
-          return expression.then(resolved => this.replaceStringEverywhere(resolved, ...replaceArgs));
-        }
-
-        if (
-          expression !== null
-          && Object.keys(expression).length === 1
-          && 'render' in expression
-          && typeof expression.render === 'function'
-        ) {
-          return this.replaceStringsInRenderer(expression, ...replaceArgs);
-        }
-
-        return expression;
-      }
-      case "function":
-        return this.replaceStringEverywhere([expression()], ...replaceArgs);
-      default:
-        return expression;
-    }
-  }
-
-  private static replaceStringsInRenderer(expression: any, searchValue: string | RegExp, replaceValue: string, scope?: string): any;
-  private static replaceStringsInRenderer(expression: any, searchValue: string | RegExp, replacer: (substring: string, ...args: any[]) => string, scope?: string): any;
-  private static replaceStringsInRenderer(renderer: RenderInstance, search: any, replace: any, scope?: string): RenderInstance {
-    return {
-      scope: scope ?? renderer.scope,
-      render: (destination) => renderer.render({
-        write: chunk => {
-          destination.write(this.replaceStringEverywhere(chunk, search, replace));
-        }
-      })
-    };
-  }
-
-  private static isInstanceByName<T>(name: string, chunk: any): chunk is T {
-    return chunk.constructor.name === name;
-  }
+		return newPromise;
+	}
 }

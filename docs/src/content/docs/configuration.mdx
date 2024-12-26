@@ -1,0 +1,38 @@
+---
+title: Configuration
+---
+
+Domain Expansion can be configured to best suit your use-case. Here's all available options that can be passed to the integration and an explanation of what they do:
+
+## `cachePages`
+
+- Type: `boolean`
+- Default: `true`
+
+`cachePages` is the setting responsible for controlling if full pages will be cached. If you have shared state between pages based on a content collection, we recommend turning this off.
+
+## `componentsHaveSharedState`
+
+- Type: `boolean`
+- Default: `false`
+
+`componentsHaveSharedState` should be turned on when components rely on shared state, for example from `Astro.locals` or a common module instead of only props.
+
+## `cacheComponents`
+
+- Type: `false | 'in-memory' | 'persistent'`
+- Default: `false`
+
+`cacheComponents` determines how and whether components should be cached:
+
+- `false`: Components will not be cached at all. For most projects, this will suffice, as pages will be cached by default.
+- `'in-memory'`: Components will be cached in-memory during build and de-duplicated if they are used with the same props. This cache will be discarded after the build process finishes. In certain cases, this may speed up cold builds.
+- `'persistent'`: Components will be cached in-memory and de-duplicated during the build process and written to disk afterwards. Only use this setting on small projects, as it will balloon the cache size massively.
+
+## `cachePrefix`
+
+- Type: `string`
+- Default: `(empty string)`
+- `@internal`
+
+`cachePrefix` is an internal setting used for tests. If for some reason you want to have two caches for the same project, feel free to change this option to something other than an empty string!

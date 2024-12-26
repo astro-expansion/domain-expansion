@@ -1,0 +1,128 @@
+[
+  {
+    "id": 1,
+    "name": "Astro Docs",
+    "url": "https://docs.astro.build",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 263.283,
+          "stdDev": 13.774
+        },
+        "cold": {
+          "mean": 272.885,
+          "stdDev": 15.867
+        },
+        "hot": {
+          "mean": 143.194,
+          "stdDev": 4.299
+        }
+      }
+    }
+  },
+  {
+    "id": 2,
+    "name": "astro.build",
+    "url": "https://astro.build",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 30.852,
+          "stdDev": 3.303
+        },
+        "cold": {
+          "mean": 31.298,
+          "stdDev": 2.398
+        },
+        "hot": {
+          "mean": 30.66,
+          "stdDev": 1.442
+        }
+      }
+    }
+  },
+  {
+    "id": 3,
+    "name": "Starlight Docs",
+    "url": "https://starlight.astro.build",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 34.021,
+          "stdDev": 2.99
+        },
+        "cold": {
+          "mean": 35.049,
+          "stdDev": 1.906
+        },
+        "hot": {
+          "mean": 29.722,
+          "stdDev": 3.016
+        }
+      }
+    }
+  },
+  {
+    "id": 4,
+    "name": "StudioCMS UI",
+    "url": "https://ui.studiocms.dev",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 10.523,
+          "stdDev": 0.455
+        },
+        "cold": {
+          "mean": 10.721,
+          "stdDev": 0.472
+        },
+        "hot": {
+          "mean": 9.826,
+          "stdDev": 0.462
+        }
+      }
+    }
+  },
+  {
+    "id": 5,
+    "name": "Zen Browser",
+    "url": "https://zen-browser.app",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 14.983,
+          "stdDev": 0.631
+        },
+        "cold": {
+          "mean": 17.88,
+          "stdDev": 0.603
+        },
+        "hot": {
+          "mean": 17.49,
+          "stdDev": 0.469
+        }
+      }
+    }
+  },
+  {
+    "id": 6,
+    "name": "Brutal",
+    "url": "https://brutal.elian.codes",
+    "benchmark": {
+      "means": {
+        "standard": {
+          "mean": 4.491,
+          "stdDev": 0.312
+        },
+        "cold": {
+          "mean": 4.638,
+          "stdDev": 0.298
+        },
+        "hot": {
+          "mean": 4.492,
+          "stdDev": 0.266
+        }
+      }
+    }
+  }
+]

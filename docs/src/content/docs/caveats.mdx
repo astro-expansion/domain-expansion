@@ -1,0 +1,41 @@
+---
+title: Caveats
+---
+
+## Diminishing Returns
+
+Let's get this out of the way first: Domain Expansion is not a silver bullet. This won't speed up every build process to below 10ms. In fact, in certain cases,
+it might even slow down your build times due to the caching overhead. Here's the general rule of thumb:
+
+1. If you have a fast CPU, you won't see significant improvements. We can only speed up the build process so much.
+2. On small sites you won't see any improvements, and might even see a slowdown.
+
+This extension is great for big projects and slow CPUs, but it's not a one-size-fits-all solution.
+
+## Engines
+
+Domain Expansion is _very_ particular about the build environment, and requires you to use Node.js. This is because the integration relies on functions that are only available in V8,
+the runtime that Node.js uses.
+
+If you use any runtime besides Node.js for building, Domain Expansion will not work. However, you are not required
+to deploy to Node.js! After the build process is complete, any Astro-compatible runtime can be used to serve the
+site.
+
+## Global State
+
+If you have components with global state, they might behave in weird ways, as Domain Expansion is unable to cache any
+shared state between components, because every component is built in isolation. This means that when retrieving a
+component from the cache, none if its side effects will be able to be recreated.
+
+## Stale Content
+
+Domain Expansion does not invalidate external content, recompute usage of random values, or datetime usage. The first time a component is rendered, it's output is cached until the cache is invalidated. For example, calling `Date.now()` in a component used in multiple locations will cause all locations to return the result of the first render of that component.
+
+## Astro Versions
+
+Domain Expansion relies on how two very specific functions are exported from Astro. Specifically where and how `$$createComponent`
+and `getImage` are declared and exported from. If these functions are moved or changed in any way, Domain Expansion
+will break. Since those functions are part of Astro's internal API, they can change at any time, even on patch releases.
+
+If you find yourself having any issues with Domain Expansion, please open an issue on the
+[GitHub repository](https://github.com/astro-expansion/domain-expansion).

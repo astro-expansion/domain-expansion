@@ -3,30 +3,48 @@ title: Domain Expansion
 description: And they said incremental builds in Astro weren't possible.
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
+import { Tabs, TabItem, Badge } from '@astrojs/starlight/components';
+import BenchmarkResults from '../../components/astro/BenchmarkResults.astro';
 
-Domain Expansion is an Astro integration that adds support for incremental builds.
+Domain Expansion is an Astro integration that adds support for incremental builds. Basically,
+builds go weee now.
+
+## Benchmarks
+
+Here's how Domain Expansion performs against the default Astro build, both in a cold and hot build scenario.
+
+<BenchmarkResults />
+
+You can read more about the benchmarks in the [benchmarks README](https://github.com/astro-expansion/domain-expansion/tree/main/benchmarks)
+on our GitHub repository.
+
+Basically - the bigger the site, the more you'll see Domain Expansion shine. You can read more about the
+trade-offs on the [caveats page](/caveats).
 
 ## Installation
 
 The Domain Expansion integration can be installed from npm using the following command:
 
 <Tabs>
-	<TabItem label="npm">
-		```bash
-		npx astro add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="pnpm">
-		```bash
-		pnpm astro add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="yarn">
-		```bash
-		yarn astro add @domain-expansion/astro
-		```
-	</TabItem>
+	  <TabItem label="npm">
+
+    	```bash
+    	npx astro add @domain-expansion/astro
+    	```
+    </TabItem>
+    <TabItem label="pnpm">
+
+    	```bash
+    	pnpm astro add @domain-expansion/astro
+    	```
+    </TabItem>
+    <TabItem label="yarn">
+
+    	```bash
+    	yarn astro add @domain-expansion/astro
+    	```
+    </TabItem>
+
 </Tabs>
 
 This will install the integration and add it to your `astro.config.mjs`.
@@ -37,32 +55,34 @@ Install the `@domain-expansion/astro` package using your package manager of choi
 
 <Tabs>
 	<TabItem label="npm">
-		```bash
-		npm i @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="pnpm">
-		```bash
-		pnpm add @domain-expansion/astro
-		```
-	</TabItem>
-	<TabItem label="yarn">
-		```bash
-		yarn add @domain-expansion/astro
-		```
-	</TabItem>
+
+    	```bash
+    	npm i @domain-expansion/astro
+    	```
+    </TabItem>
+    <TabItem label="pnpm">
+
+    	```bash
+    	pnpm add @domain-expansion/astro
+    	```
+    </TabItem>
+    <TabItem label="yarn">
+
+    	```bash
+    	yarn add @domain-expansion/astro
+    	```
+    </TabItem>
+
 </Tabs>
 
 Import and use the integration in your `astro.config.mjs`:
 
 ```js
 import { defineConfig } from 'astro/config';
-import domainExpansion from "@domain-expansion/astro";
+import domainExpansion from '@domain-expansion/astro';
 
 export default defineConfig({
-	integrations: [
-		domainExpansion(),
-	],
+	integrations: [domainExpansion()],
 });
 ```
 
@@ -71,6 +91,15 @@ export default defineConfig({
 Once the integration has been included in your `astro.config.mjs`, the next time you build your site,
 your build will be cached. From that point on, whenever you rebuild your site, only the files that have
 changed will be rebuilt.
+
+### When to use
+
+Use this when you have big, and we mean **BIG** Astro sites. You'll see diminishing returns on smaller sites.
+
+### Even more optimization
+
+Pray that [Rolldown](https://rolldown.rs/) gets released soon. It's current version, Rollup,
+accounts for about 90% of the build time for subsequent builds.
 
 ## Authors
 

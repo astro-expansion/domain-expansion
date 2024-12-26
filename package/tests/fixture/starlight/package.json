@@ -1,0 +1,12 @@
+{
+  "name": "@domain-expansion-test/basic",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@astrojs/starlight": "^0.30.0",
+    "@domain-expansion/astro": "workspace:",
+    "astro": "catalog:",
+    "sharp": "^0.32.5"
+  }
+}

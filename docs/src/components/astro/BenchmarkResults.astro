@@ -1,0 +1,116 @@
+---
+import { getCollection } from 'astro:content';
+import { BenchmarkChart } from '../other/BenchmarkChart.tsx';
+
+const results = await getCollection('benchmark');
+---
+
+<ul class="legend not-content">
+	<li class="legend-item">
+		<span class="legend-color teal"></span>
+		<span>With Domain Expansion enabled, subsequent builds (with cache)</span>
+	</li>
+	<li class="legend-item">
+		<span class="legend-color sapphire"></span>
+		<span>With Domain Expansion enabled, initial build</span>
+	</li>
+	<li class="legend-item">
+		<span class="legend-color lavender"></span>
+		<span>Without Domain Expansion</span>
+	</li>
+</ul>
+
+<div class="benchmarks-grid not-content">
+	{
+		results.map((result) => (
+			<div class="benchmark-card">
+				<div class="benchmark-result">
+					<BenchmarkChart results={result} client:only />
+				</div>
+				<div class="benchmark-card-footer">
+					<span>{result.data.name}</span>
+					<a href={result.data.url}>{result.data.url}</a>
+				</div>
+			</div>
+		))
+	}
+</div>
+
+<style>
+	.benchmarks-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 1rem;
+		margin-bottom: 2rem;
+	}
+
+	.benchmark-card {
+		border: 1px solid var(--sl-color-gray-5);
+		min-height: calc(250px + 1rem + 2px);
+		border-radius: 4px;
+	}
+
+	.benchmark-result {
+		min-height: calc(250px + 1rem + 2px);
+		padding: 0.5rem;
+	}
+
+	.benchmark-card-footer {
+		border-top: 1px solid var(--sl-color-gray-5);
+		padding: 1rem 1.25rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.benchmark-card-footer a {
+		font-size: 0.875rem;
+		width: fit-content;
+		text-decoration: none;
+	}
+
+	.benchmark-card-footer a:hover {
+		text-decoration: underline;
+	}
+
+	.benchmark-card-footer span {
+		font-size: 1.25rem;
+		font-weight: 500;
+	}
+
+	.legend {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.legend-item span {
+		font-size: 0.875rem;
+	}
+
+	.legend-color {
+		width: 1rem;
+		height: 1rem;
+		min-width: 1rem;
+		border-radius: 4px;
+		display: inline-block;
+		margin-right: 0.5rem;
+		top: 3px;
+		position: relative;
+	}
+
+	.teal {
+		background-color: #94e2d5;
+	}
+
+	.sapphire {
+		background-color: #74c7ec;
+	}
+
+	.lavender {
+		background-color: #b4befe;
+	}
+</style>

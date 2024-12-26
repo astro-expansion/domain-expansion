@@ -1,5 +1,9 @@
+catalog:
+  astro: ^5.0.0
+
 packages:
   - package
+  - package/tests/fixture/*
   - packages/*
   - playground
   - docs
