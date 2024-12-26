@@ -27,6 +27,7 @@ export default defineConfig({
 			sidebar: [
 				{ label: 'Installation', slug: '' },
 				{ label: 'Configuration', slug: 'configuration' },
+				{ label: 'Deploying', slug: 'deploying' },
 				{ label: 'The Tale of the Three Mages', slug: 'the-tale-of-the-three-mages' },
 				{ label: 'An actual explanation of what is going on here', slug: 'actual-explanation' },
 				{ label: 'Caveats', slug: 'caveats' },

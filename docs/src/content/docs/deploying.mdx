@@ -1,0 +1,30 @@
+---
+title: Deploying
+---
+
+Here's guides on how to deploy Astro projects using Domain Expansion to different providers:
+
+## Vercel
+
+It just works.
+
+## Netlify
+
+It just works.
+
+## @astrojs/node (without Docker)
+
+It just works.
+
+## Docker (Coolify etc.)
+
+In Docker, we recommend using [cache mounts](https://docs.docker.com/build/cache/optimize/#use-cache-mounts). Here's how to use them within a `Dockerfile`:
+
+```Dockerfile
+RUN --mount=type=cache,target=/app/node_modules/.domain-expansion npm run build
+```
+
+Other than that, <br />
+**It just works.**
+<br /><br />
+<sub>Seeing a pattern here?</sub>
