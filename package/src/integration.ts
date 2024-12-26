@@ -17,7 +17,7 @@ function getDefaultCacheComponents(): false | 'in-memory' | 'persistent' {
 			return 'persistent';
 		case '':
 		case undefined:
-			return 'in-memory';
+			return false;
 		default:
 			console.warn(chalk.bold.redBright(`Invalid environment variable value for component cache: ${env}`));
 			console.warn(chalk.italic.yellow('Assuming "in-memory" as default.'));
@@ -33,7 +33,17 @@ export const integration = defineIntegration({
 		/**
 		 * Whether non-page components should be cached.
 		 *
-		 * - `false` means not caching at all
+		 * - `false` (default) means not caching at all
+		 * - `in-memory` means deduplicating repeated uses of components
+		 *   without persisting them to disk
+		 * - `persistent` means persisting all uses of components to disk
+		 *   just like pages. Changes to other segments of a page will use
+		 *   the cached result of all unchanged components
+		 *
+		 * Components receiving slots are never cached.
+		 * If your component relies on state provided through Astro.locals
+		 * or any other means (like Starlight), you should not enable
+		 * cached components.
 		 */
 		cacheComponents: z.enum(['in-memory', 'persistent'])
 			.or(z.literal(false))

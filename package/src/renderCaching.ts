@@ -1,6 +1,5 @@
 import type * as Runtime from "astro/compiler-runtime";
 import hashSum from "hash-sum";
-import { Cache } from "./cache.js";
 import { rootDebug } from "./debug.js";
 import type { AstroComponentFactory } from "astro/runtime/server/index.js";
 import type { SSRMetadata, SSRResult } from "astro";
@@ -8,7 +7,7 @@ import { runtime } from "./utils.js";
 import type { RenderDestination } from "astro/runtime/server/render/common.js";
 import type { PersistedMetadata } from "./renderFileStore.js";
 import { isDeepStrictEqual, types } from "node:util";
-import { computeEntryHash, getCurrentContext, makeContextTracking } from "./contextTracking.js";
+import { computeEntryHash, getCachingOptions, getCurrentContext, makeContextTracking } from "./contextTracking.js";
 
 const debug = rootDebug.extend('render-caching');
 
@@ -16,19 +15,6 @@ const ASSET_SERVICE_CALLS = Symbol('@domain-expansion:astro-assets-service-calls
 
 interface ExtendedSSRResult extends SSRResult {
   [ASSET_SERVICE_CALLS]: PersistedMetadata['assetServiceCalls'];
-}
-
-let cachingOptions: {
-  cache: Cache,
-  root: string,
-  routeEntrypoints: string[],
-  componentHashes: Map<string, string>,
-  cacheComponents: false | 'in-memory' | 'persistent',
-  cachePages: boolean,
-};
-
-export function setCachingOptions(options: typeof cachingOptions) {
-  cachingOptions = options;
 }
 
 (globalThis as any)[Symbol.for('@domain-expansion:astro-component-caching')] = (
@@ -43,7 +29,7 @@ export function setCachingOptions(options: typeof cachingOptions) {
 
     let cacheScope = options.moduleId || '';
 
-    const { componentHashes } = cachingOptions;
+    const { componentHashes } = getCachingOptions();
 
     if (!options.moduleId || !componentHashes.has(options.moduleId)) {
       if (!context) return originalFn(options);
@@ -69,7 +55,7 @@ export function setCachingOptions(options: typeof cachingOptions) {
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
-    const { cache, routeEntrypoints, componentHashes, ...cacheOptions } = cachingOptions;
+    const { cache, routeEntrypoints, componentHashes, ...cacheOptions } = getCachingOptions();
 
     const isEntrypoint = routeEntrypoints.includes(moduleId!);
     const cacheParams: Record<'persist' | 'skipInMemory', boolean> = {
@@ -125,10 +111,15 @@ export function setCachingOptions(options: typeof cachingOptions) {
 
       const hash = hashSum(
         isEntrypoint
-          ? [result.compressHTML, result.params, url.pathname, url.search, resolvedProps]
-          : [result.compressHTML, resolvedProps]
+          ? [moduleId, result.compressHTML, result.params, url.pathname, resolvedProps]
+          : [moduleId, result.compressHTML, resolvedProps]
       );
       const cacheKey = `${cacheScope}:${hash}`;
+      console.log({
+        moduleId, cacheKey,
+        pathname: url.pathname,
+        search: url.search,
+      });
 
       const { runIn: enterTrackingScope, collect: collectTracking } = makeContextTracking();
 
@@ -230,6 +221,11 @@ export function setCachingOptions(options: typeof cachingOptions) {
         if (currentHash !== hash) return null;
       }
 
+      for (const entry of cachedMetadata.renderEntryCalls) {
+        const currentHash = await computeEntryHash(entry.filePath);
+        if (currentHash !== entry.hash) return null;
+      }
+
       for (const { options, resultingAttributes } of cachedMetadata.assetServiceCalls) {
         debug('Replaying getImage call', { options });
         const result = await runtime.getImage(options);
@@ -238,11 +234,6 @@ export function setCachingOptions(options: typeof cachingOptions) {
           debug('Image call mismatch, bailing out of cache');
           return null;
         }
-      }
-
-      for (const entry of cachedMetadata.renderEntryCalls) {
-        const currentHash = await computeEntryHash(entry.filePath);
-        if (currentHash !== entry.hash) return null;
       }
 
       return cachedMetadata;

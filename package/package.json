@@ -18,7 +18,7 @@
 	"publishConfig": {
 		"access": "public"
 	},
-	"sideEffects": false,
+	"sideEffects": true,
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",

@@ -3,12 +3,13 @@ import type { AstNode, TransformPluginContext } from 'rollup';
 import { walk, type Node as ETreeNode } from 'estree-walker';
 import { rootDebug } from './debug.js';
 import { AstroError } from 'astro/errors';
-import { setCachingOptions } from './renderCaching.js';
+import { setCachingOptions } from './contextTracking.js';
 import { Cache } from './cache.js';
 import { createResolver } from 'astro-integration-kit';
 import MagicString, { type SourceMap } from 'magic-string';
 import hash_sum from 'hash-sum';
 import assert from 'node:assert';
+import './renderCaching.js';
 import { randomBytes } from 'node:crypto';
 
 const debug = rootDebug.extend('interceptor-plugin');

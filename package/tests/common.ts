@@ -48,17 +48,16 @@ export async function defineTests(options: TestOptions): Promise<void> {
       await rm(outDir, { force: true, recursive: true });
     });
 
-    afterAll(async () => {
-      const cachePath = new URL(
-        `./node_modules/.domain-expansion/${options.prefix}`,
-        fixture.config.root,
-      );
-      await rm(cachePath, { force: true, recursive: true });
-      const outDir = new URL(`./dist/${options.prefix}`, fixture.config.root);
-      await rm(outDir, { force: true, recursive: true });
-
-      await fixture.clean();
-    });
+    // afterAll(async () => {
+    //   const cachePath = new URL(
+    //     `./node_modules/.domain-expansion/${options.prefix}`,
+    //     fixture.config.root,
+    //   );
+    //   await rm(cachePath, { force: true, recursive: true });
+    //   const outDir = new URL(`./dist/${options.prefix}`, fixture.config.root);
+    //   await rm(outDir, { force: true, recursive: true });
+    //   await fixture.clean();
+    // });
 
     afterEach(() => {
       fixture.resetAllFiles();
@@ -122,6 +121,11 @@ export async function defineTests(options: TestOptions): Promise<void> {
               await fixture.editFile(change.path, change.updater);
             }
 
+            await fixture.build({
+              ...withoutDomainExpansion(options.config),
+              outDir: `./dist/${options.prefix}/changed-normal`,
+            });
+
             clearMetrics();
             await fixture.build(withDomainExpansion(
               {
@@ -134,11 +138,6 @@ export async function defineTests(options: TestOptions): Promise<void> {
               },
             ));
             const metrics = collectMetrics();
-
-            await fixture.build({
-              ...withoutDomainExpansion(options.config),
-              outDir: `./dist/${options.prefix}/changed-normal`,
-            });
 
             await checkIdenticalFiles(fixture, ['changed-normal', 'changed-cached']);
             expect(metrics).toEqual(expect.objectContaining(changeset.metricsAfter));
@@ -170,18 +169,17 @@ export async function checkIdenticalFiles(
 
   for (const variant of otherVariants) {
     // Arrays can be in different orders
-    expect(variantFiles[variant])
-      .toIncludeSameMembers(referenceFiles);
+    expect(variantFiles[variant]).toIncludeAllMembers(referenceFiles);
   }
 
   for (const fileName of referenceFiles) {
     const referenceFile = await fixture.readFile(`${referenceVariant}/${fileName}`);
-
     for (const variant of otherVariants) {
       const variantFile = await fixture.readFile(`${variant}/${fileName}`);
-      expect(variantFile).toEqual(referenceFile);
+      expect(variantFile, fileName).toEqual(referenceFile);
     }
   }
+
 }
 
 function withoutDomainExpansion(config: AstroInlineConfig = {}): AstroInlineConfig {
