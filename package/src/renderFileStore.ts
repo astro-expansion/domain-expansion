@@ -1,12 +1,11 @@
 import { createResolver } from "astro-integration-kit";
-import type { RenderDestination, RenderDestinationChunk } from "astro/runtime/server/render/common.js";
+import type { RenderDestinationChunk } from "astro/runtime/server/render/common.js";
 import { rootDebug } from "./debug.js";
 import * as fs from 'node:fs';
 import type { AstroFactoryReturnValue } from "astro/runtime/server/render/astro/factory.js";
 import { Either, runtime, type Thunk } from "./utils.js";
 import type { SSRMetadata } from "astro";
 import type { RenderInstruction } from "astro/runtime/server/render/instruction.js";
-import type { RenderTemplateResult } from "astro/runtime/server/render/astro/render-template.js";
 import * as zlib from "node:zlib";
 import { promisify } from "node:util";
 import { fsCacheHit, fsCacheMiss, trackLoadedCompressedData, trackLoadedData, trackStoredCompressedData, trackStoredData } from "./metrics.js";
@@ -297,16 +296,16 @@ export class RenderFileStore {
   private static normalizeValue(value: SerializedValue): ValueThunk {
     switch (value.type) {
       case "headAndContent": {
-        const seminormalChunks = value.chunks.map(Either.right);
+        const normalChunks = value.chunks.map(RenderFileStore.normalizeChunk);
         return () => runtime.createHeadAndContent(
           // SAFETY: Astro core is wrong
           new runtime.HTMLString(value.head) as unknown as string,
-          RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks),
+          FactoryValueClone.renderTemplateFromChunks(normalChunks),
         );
       }
       case "templateResult": {
-        const seminormalChunks = value.chunks.map(Either.right);
-        return () => RenderFileStore.renderTemplateFromSeminormalizedChunks(seminormalChunks);
+        const normalChunks = value.chunks.map(RenderFileStore.normalizeChunk);
+        return () => FactoryValueClone.renderTemplateFromChunks(normalChunks);
       }
       case "response":
         return () => RenderFileStore.normalizeResponse(value);
@@ -359,7 +358,8 @@ export class RenderFileStore {
     }
 
     if (chunk instanceof Response) {
-      return RenderFileStore.denormalizeResponse(chunk);
+      const { denormalized } = await RenderFileStore.denormalizeResponse(chunk)
+      return denormalized!;
     }
 
     if ('buffer' in chunk) return {
@@ -453,28 +453,6 @@ export class RenderFileStore {
       status: value.status,
       statusText: value.statusText,
     });
-  }
-
-  private static renderTemplateFromSeminormalizedChunks(chunks: Either<RenderDestinationChunk, SerializedChunk>[]): RenderTemplateResult {
-    const template = runtime.renderTemplate(Object.assign([], { raw: [] }));
-
-    return Object.assign(template, {
-      render: (destination: RenderDestination) => {
-        return new Promise<void>(resolve => {
-          setImmediate(() => {
-            for (const chunk of chunks) {
-              if (Either.isLeft(chunk)) {
-                destination.write(chunk.value);
-              } else {
-                destination.write(RenderFileStore.normalizeChunk(chunk.value));
-              }
-            }
-
-            resolve();
-          });
-        });
-      }
-    })
   }
 
   private static isSerializableRenderInstruction(
