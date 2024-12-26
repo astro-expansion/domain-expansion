@@ -55,7 +55,13 @@ interface ExtendedSSRResult extends SSRResult {
   }
 
   function cacheFn(cacheScope: string, factory: AstroComponentFactory, moduleId?: string): AstroComponentFactory {
-    const { cache, routeEntrypoints, componentHashes, ...cacheOptions } = getCachingOptions();
+    const {
+      cache,
+      routeEntrypoints,
+      componentHashes,
+      componentsHaveSharedState,
+      ...cacheOptions
+    } = getCachingOptions();
 
     const isEntrypoint = routeEntrypoints.includes(moduleId!);
     const cacheParams: Record<'persist' | 'skipInMemory', boolean> = {
@@ -110,16 +116,11 @@ interface ExtendedSSRResult extends SSRResult {
       const url = new URL(result.request.url);
 
       const hash = hashSum(
-        isEntrypoint
+        isEntrypoint || componentsHaveSharedState
           ? [moduleId, result.compressHTML, result.params, url.pathname, resolvedProps]
           : [moduleId, result.compressHTML, resolvedProps]
       );
       const cacheKey = `${cacheScope}:${hash}`;
-      console.log({
-        moduleId, cacheKey,
-        pathname: url.pathname,
-        search: url.search,
-      });
 
       const { runIn: enterTrackingScope, collect: collectTracking } = makeContextTracking();
 

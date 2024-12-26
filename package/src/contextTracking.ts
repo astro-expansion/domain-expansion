@@ -36,6 +36,7 @@ let cachingOptions: {
   componentHashes: Map<string, string>,
   cacheComponents: false | 'in-memory' | 'persistent',
   cachePages: boolean,
+  componentsHaveSharedState: boolean,
   resolver: ReturnType<typeof createResolver>['resolve'],
 };
 

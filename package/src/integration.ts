@@ -42,12 +42,14 @@ export const integration = defineIntegration({
 		 *
 		 * Components receiving slots are never cached.
 		 * If your component relies on state provided through Astro.locals
-		 * or any other means (like Starlight), you should not enable
-		 * cached components.
+		 * or any other means (like Starlight), you should also enable
+		 * `componentHasSharedState` to make sure the component is only
+		 * reused when the shared state is not expected to change.
 		 */
 		cacheComponents: z.enum(['in-memory', 'persistent'])
 			.or(z.literal(false))
 			.default(getDefaultCacheComponents()),
+		componentsHaveSharedState: z.boolean().default(false),
 		cachePages: z.boolean()
 			.default((process.env.DOMAIN_EXPANSION_CACHE_PAGES || 'true') === 'true'),
 		/**

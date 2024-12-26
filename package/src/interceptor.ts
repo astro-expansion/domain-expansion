@@ -28,6 +28,7 @@ type ParseNode = ETreeNode & AstNode;
 export const interceptorPlugin = (options: {
   cacheComponents: false | 'in-memory' | 'persistent',
   cachePages: boolean,
+  componentsHaveSharedState: boolean,
   routeEntrypoints: string[],
   cachePrefix: string,
 }): { plugin: Plugin, cleanup: () => Promise<void> } => {

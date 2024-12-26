@@ -1,5 +1,5 @@
 ---
-title: Starlight 🌟 Build documentation sites with Astro
+title: Sample page
 head:
   - tag: title
     content: Starlight 🌟 Build documentation sites with Astro
