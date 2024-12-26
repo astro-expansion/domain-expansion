@@ -1,5 +1,11 @@
 # @domain-expansion/astro
 
+## 0.1.0-beta.8
+
+### Minor Changes
+
+- Make statefull components configurable through env vars
+
 ## 0.1.0-beta.7
 
 ### Minor Changes

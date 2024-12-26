@@ -53,7 +53,9 @@ export const integration = defineIntegration({
 				.enum(['in-memory', 'persistent'])
 				.or(z.literal(false))
 				.default(getDefaultCacheComponents()),
-			componentsHaveSharedState: z.boolean().default(false),
+			componentsHaveSharedState: z
+				.boolean()
+				.default(process.env.DOMAIN_EXPANSION_STATEFULL_COMPONENTS === 'true'),
 			cachePages: z
 				.boolean()
 				.default((process.env.DOMAIN_EXPANSION_CACHE_PAGES || 'true') === 'true'),
